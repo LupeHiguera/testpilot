@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getRun, listRuns, triggerRun } from './api';
 import { useEventStream } from './useEventStream';
+import { PixelCanyon } from './PixelCanyon';
 import type { PipelineEvent, RunSummary, Stage, Status } from './types';
 
 const STATUS_GLYPH: Record<Status, string> = { start: '▶', pass: '✓', fail: '✕', info: '•' };
@@ -15,9 +16,23 @@ const STAGE_NAME: Record<Stage, string> = {
   decision: 'Decision'
 };
 
+const CONNECTION_NOTE: Record<string, string> = {
+  open: 'Live — streaming events',
+  connecting: 'Connecting to the event stream…',
+  closed: 'Stream closed — reconnecting'
+};
+
+interface Diagnosis {
+  category?: string;
+  confidence?: number;
+  reason?: string;
+  repairable?: boolean;
+}
+
 export function App() {
   const { events, connection } = useEventStream();
   const [runs, setRuns] = useState<RunSummary[]>([]);
+  const [runsLoading, setRunsLoading] = useState(true);
   const [runsError, setRunsError] = useState<string>();
   const [selected, setSelected] = useState<string | null>(null); // null = live view
   const [running, setRunning] = useState(false);
@@ -28,7 +43,8 @@ export function App() {
         setRuns(list);
         setRunsError(undefined);
       })
-      .catch((error: Error) => setRunsError(error.message));
+      .catch((error: Error) => setRunsError(error.message))
+      .finally(() => setRunsLoading(false));
   }, []);
 
   useEffect(refreshRuns, [refreshRuns]);
@@ -58,12 +74,12 @@ export function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <div>
-          <div className="wordmark">test<b>pilot</b></div>
+        <div className="brand">
+          <h1 className="wordmark">test<b>pilot</b></h1>
           <div className="tagline">agentic QA · live canyon view</div>
         </div>
         <div className="spacer" />
-        <span className="conn">
+        <span className="conn" role="status">
           <span className={`dot ${connection}`} aria-hidden /> {connection}
         </span>
         <button onClick={onRun} disabled={running}>
@@ -75,27 +91,37 @@ export function App() {
         <aside className="panel" aria-label="Run history">
           <h2>Runs</h2>
           {runsError && <p className="muted">Couldn’t load runs: {runsError}</p>}
-          {!runsError && runs.length === 0 && <p className="muted">No runs yet.</p>}
           <ul className="runlist">
             <li>
               <button className={selected === null ? 'active' : ''} onClick={() => setSelected(null)}>
                 ● Live view
               </button>
             </li>
-            {runs.map((run) => (
-              <li key={run.runId}>
-                <button className={selected === run.runId ? 'active' : ''} onClick={() => setSelected(run.runId)}>
-                  {run.runId.replace(/^demo-/, '').replace(/T/, ' ').replace(/-\d+Z$/, '')}
-                  <span className="when">{new Date(run.createdAt).toLocaleString()}</span>
-                  {run.summary && (
-                    <span className="chips">
-                      <Chip text={run.summary.copyChange ?? '—'} kind="pass" />
-                      <Chip text={run.summary.regression ?? '—'} kind="fail" />
-                    </span>
-                  )}
-                </button>
-              </li>
-            ))}
+            {runsLoading && !runsError ? (
+              <RunListSkeleton />
+            ) : (
+              <>
+                {!runsError && runs.length === 0 && (
+                  <li>
+                    <p className="muted runlist-empty">No runs yet.</p>
+                  </li>
+                )}
+                {runs.map((run) => (
+                  <li key={run.runId}>
+                    <button className={selected === run.runId ? 'active' : ''} onClick={() => setSelected(run.runId)}>
+                      {run.runId.replace(/^demo-/, '').replace(/T/, ' ').replace(/-\d+Z$/, '')}
+                      <span className="when">{new Date(run.createdAt).toLocaleString()}</span>
+                      {run.summary && (
+                        <span className="chips">
+                          <Chip text={run.summary.copyChange ?? '—'} kind="pass" />
+                          <Chip text={run.summary.regression ?? '—'} kind="fail" />
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </>
+            )}
           </ul>
         </aside>
 
@@ -111,30 +137,130 @@ export function App() {
   );
 }
 
+function RunListSkeleton() {
+  return (
+    <>
+      {[0, 1, 2].map((i) => (
+        <li key={i} aria-hidden>
+          <div className="skeleton-row">
+            <span className="skeleton skeleton-line w-70" />
+            <span className="skeleton skeleton-line w-40" />
+          </div>
+        </li>
+      ))}
+      <li className="muted runlist-loading" role="status">
+        Loading runs…
+      </li>
+    </>
+  );
+}
+
+/** Pull the run-level verdict out of the live event stream, if available. */
+function deriveVerdict(events: PipelineEvent[]) {
+  const diagnoses = events
+    .filter((e) => e.stage === 'diagnose' && e.data?.diagnosis)
+    .map((e) => e.data!.diagnosis as Diagnosis);
+  const regression = diagnoses.find((d) => d.category === 'PRODUCT_REGRESSION');
+  const repairEvent = events.find((e) => e.stage === 'repair');
+  const repairApplied = repairEvent ? repairEvent.status === 'pass' : false;
+  const repairRefused = repairEvent?.status === 'info';
+  const decision = events.find((e) => e.stage === 'decision' && e.status !== 'start');
+
+  if (!decision && !repairEvent && diagnoses.length === 0) {
+    return null;
+  }
+  return {
+    category: regression?.category ?? diagnoses[0]?.category,
+    repairApplied,
+    repairRefused,
+    failed: decision?.status === 'fail',
+    done: Boolean(decision)
+  };
+}
+
+function VerdictBanner({ events }: { events: PipelineEvent[] }) {
+  const verdict = deriveVerdict(events);
+  if (!verdict) {
+    return null;
+  }
+  const { category, repairApplied, repairRefused, failed, done } = verdict;
+  const tone = failed ? 'error' : repairApplied ? 'repaired' : 'guarded';
+  const headline = failed
+    ? 'Run failed'
+    : repairApplied
+      ? 'Repair applied'
+      : repairRefused
+        ? 'Repair refused'
+        : done
+          ? 'Run complete'
+          : 'In progress';
+
+  return (
+    <div className={`verdict verdict-${tone}`} role="status">
+      <span className="verdict-mark" aria-hidden>
+        {failed ? '✕' : repairApplied ? '✓' : '⚠'}
+      </span>
+      <div className="verdict-body">
+        <div className="verdict-headline">{headline}</div>
+        <div className="verdict-detail">
+          {category && (
+            <span className={`tag tag-${category === 'PRODUCT_REGRESSION' ? 'regression' : 'copy'}`}>
+              {category.replace(/_/g, ' ')}
+            </span>
+          )}
+          <span className="verdict-note">
+            {repairApplied
+              ? 'Safe copy-change auto-repaired; regression refused.'
+              : repairRefused
+                ? 'Change refused — would weaken the test.'
+                : done
+                  ? 'See strata below for full evidence.'
+                  : 'Awaiting the decision strata…'}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LiveCanyon({ events, connection }: { events: PipelineEvent[]; connection: string }) {
   if (events.length === 0) {
     return (
       <div className="panel hero">
-        <h2>Watch a run descend the canyon</h2>
-        <p className="muted">
-          Each pipeline stage forms a rock layer as it runs. Press <strong>Run demo</strong> to stream one live.
-        </p>
-        <p className="muted">Stream: {connection}</p>
+        <PixelCanyon />
+        <div className="hero-copy">
+          <h2>Watch a run descend the canyon</h2>
+          <p className="muted">
+            Each pipeline stage forms a rock layer as it runs. Press <strong>Run demo</strong> to stream one live.
+          </p>
+          <p className={`stream-note stream-${connection}`}>
+            <span className={`dot ${connection}`} aria-hidden /> {CONNECTION_NOTE[connection] ?? connection}
+          </p>
+        </div>
       </div>
     );
   }
+  const degraded = connection !== 'open';
   return (
-    <div className="canyon">
-      {events.map((event, index) => (
-        <Strata key={event.id} event={event} active={index === events.length - 1 && event.status === 'start'} />
-      ))}
+    <div className={`canyon-pane ${degraded ? 'degraded' : ''}`}>
+      {degraded && (
+        <div className={`liveness-strip liveness-${connection}`} role="status">
+          <span className={`dot ${connection}`} aria-hidden /> {CONNECTION_NOTE[connection] ?? connection}
+        </div>
+      )}
+      <VerdictBanner events={events} />
+      <div className="canyon">
+        {events.map((event, index) => (
+          <Strata key={event.id} event={event} active={index === events.length - 1 && event.status === 'start'} />
+        ))}
+      </div>
     </div>
   );
 }
 
 function Strata({ event, active }: { event: PipelineEvent; active: boolean }) {
   const [open, setOpen] = useState(false);
-  const evidence = extractEvidence(event);
+  const evidence = collectEvidence(event);
   const hasEvidence = Boolean(evidence);
   return (
     <>
@@ -155,46 +281,74 @@ function Strata({ event, active }: { event: PipelineEvent; active: boolean }) {
         </span>
         <span className={`badge ${event.status}`}>{event.status}</span>
       </div>
-      {open && evidence}
+      {open && evidence && <Evidence {...evidence} />}
     </>
   );
 }
 
-function extractEvidence(event: PipelineEvent): JSX.Element | null {
+interface EvidenceData {
+  diagnosis?: Diagnosis;
+  shots: Array<{ key: string; value: string }>;
+  diff?: string;
+}
+
+/** Human captions for the well-known screenshot artifact keys. */
+const SHOT_CAPTION: Record<string, string> = {
+  beforeScreenshot: 'Before — failing',
+  failureScreenshot: 'Before — failing',
+  afterScreenshot: 'After — repaired',
+  screenshot: 'Observed page'
+};
+
+function collectEvidence(event: PipelineEvent): EvidenceData | null {
   const data = event.data ?? {};
   const shots = ['screenshot', 'failureScreenshot', 'beforeScreenshot', 'afterScreenshot']
-    .map((key) => [key, data[key]] as const)
-    .filter(([, value]) => typeof value === 'string') as [string, string][];
-  const diagnosis = data.diagnosis as { category?: string; confidence?: number; reason?: string; repairable?: boolean } | undefined;
+    .map((key) => ({ key, value: data[key] }))
+    .filter((s): s is { key: string; value: string } => typeof s.value === 'string');
+  const diagnosis = data.diagnosis as Diagnosis | undefined;
   const diff = typeof data.diff === 'string' ? (data.diff as string) : undefined;
 
   if (shots.length === 0 && !diagnosis && !diff) {
     return null;
   }
+  return { diagnosis, shots, diff };
+}
+
+function Evidence({ diagnosis, shots, diff }: EvidenceData) {
   return (
     <div className="evidence">
       {diagnosis && (
-        <div>
+        <div className="evidence-block">
           <h3>Diagnosis</h3>
-          <p>
-            <strong>{diagnosis.category}</strong> · confidence {diagnosis.confidence} ·{' '}
-            {diagnosis.repairable ? 'repairable' : 'repair refused'}
+          <p className="diagnosis-line">
+            <span className={`tag tag-${diagnosis.category === 'PRODUCT_REGRESSION' ? 'regression' : 'copy'}`}>
+              {(diagnosis.category ?? 'UNKNOWN').replace(/_/g, ' ')}
+            </span>
+            {typeof diagnosis.confidence === 'number' && (
+              <span className="muted">confidence {diagnosis.confidence}</span>
+            )}
+            <span className={`pill ${diagnosis.repairable ? 'pill-ok' : 'pill-no'}`}>
+              {diagnosis.repairable ? 'repairable' : 'repair refused'}
+            </span>
           </p>
           {diagnosis.reason && <p className="reason">{diagnosis.reason}</p>}
         </div>
       )}
       {shots.length > 0 && (
-        <div>
+        <div className="evidence-block">
           <h3>Screenshots</h3>
-          {shots.map(([key, value]) => (
-            <figure key={key} style={{ margin: 0 }}>
-              <img src={`/artifacts/${value}`} alt={key} loading="lazy" />
-            </figure>
-          ))}
+          <div className="shot-grid">
+            {shots.map(({ key, value }) => (
+              <figure className="shot" key={key}>
+                <img src={`/artifacts/${value}`} alt={SHOT_CAPTION[key] ?? key} loading="lazy" />
+                <figcaption>{SHOT_CAPTION[key] ?? key}</figcaption>
+              </figure>
+            ))}
+          </div>
         </div>
       )}
       {diff && (
-        <div>
+        <div className="evidence-block">
           <h3>Proposed change</h3>
           <pre>{renderDiff(diff)}</pre>
         </div>
