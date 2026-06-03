@@ -1,41 +1,49 @@
 /* ============================================================================
-   testpilot live view — desert / Grand Canyon design system
-   Constrained palette + spacing & type scales. No ad-hoc values.
+   testpilot live view — SONORAN DUSK design system
+   A deliberate, warm desert palette (NO indigo/purple). Constrained tokens,
+   pixel-art borders, eroded-strata rock wall, dither + scanline texture.
    ========================================================================== */
 :root {
-  /* Canyon strata palette (sunlit rim -> deep shadow) */
-  --strata-1: #f2c14e; /* sunlit sandstone */
-  --strata-2: #e0a96d; /* ochre */
-  --strata-3: #c8703f; /* terracotta */
-  --strata-repair: #b05a3a; /* burnt sienna — keeps the rim→shadow gradient monotonic */
-  --strata-4: #a04a35; /* rust */
-  --strata-5: #6e466b; /* shadow mauve */
-  --strata-6: #3c3357; /* deep indigo rock */
+  /* --- Canyon strata: one unbroken sunlit-rim -> bedrock depth sequence.
+     Eight layers, one per pipeline stage, so the geological depth metaphor is
+     continuous (no out-of-band repair color, no reused layer). */
+  --strata-1: #f0bf6b; /* sunlit sandstone — spec / rim */
+  --strata-2: #e0a05a; /* ochre — observe / caprock */
+  --strata-3: #d18a4a; /* amber sandstone — generate */
+  --strata-4: #c8703f; /* terracotta — run */
+  --strata-5: #a8512f; /* rust — diagnose */
+  --strata-6: #b85a34; /* burnt sienna — repair / schist */
+  --strata-7: #7d3b29; /* oxblood — pr / ledge */
+  --strata-8: #5a2c22; /* deep canyon shadow — decision / bedrock */
 
-  /* Surfaces */
-  --night: #241d33; /* canyon night background */
-  --night-2: #2e2745; /* raised panel */
-  --night-3: #392f52; /* hover / inset */
-  --rim: #4a3f63; /* hairline borders */
+  /* --- Surfaces: warm desert-night, NOT indigo. Charred-clay browns. */
+  --night: #261712; /* canyon-floor night */
+  --night-2: #311e16; /* raised clay panel */
+  --night-3: #3d271c; /* hover / inset */
+  --rim: #5c3a28; /* hairline borders (warm) */
+  --rim-bright: #8a5436; /* lit pixel edge */
 
-  /* Ink */
-  --sand: #f4e4c9; /* primary text on dark */
-  --sand-dim: #c9b89c; /* secondary text */
-  --ink: #241d33; /* text on light chips */
+  /* --- Dusk sky accents (hero + highlights) */
+  --dusk-rose: #caa7b8;
+  --dusk-amber: #e08e63;
 
-  /* Accents */
-  --turquoise: #2fa89a; /* Southwestern accent / pass */
+  /* --- Ink */
+  --sand: #f6e7cd; /* primary text on dark */
+  --sand-dim: #d3b896; /* secondary text */
+  --ink: #2a140e; /* text on light chips */
+
+  /* --- Accents */
+  --turquoise: #2fa89a; /* river / pass */
   --turquoise-deep: #1f7d72;
   --turquoise-bright: #6fe3d3; /* pass text on dark chip — meets 4.5:1 */
-  --sun: #f2c14e;
-  --sun-bright: #f7d98a;
-  --canyon-red: #c0432f; /* fail */
-  --canyon-red-bright: #ff8a72; /* fail text on dark chip */
-  --sky: #8fb9cc;
+  --sun: #ffcf5e;
+  --sun-bright: #ffe199;
+  --canyon-red: #d9492f; /* fail */
+  --canyon-red-bright: #ff8f74; /* fail text on dark chip */
 
   /* Neutral dark chip surface for badges so they don't sit on warm strata */
-  --chip: #1b1426;
-  --chip-2: #271c33;
+  --chip: #1c0f0a;
+  --chip-2: #2a1810;
 
   /* Spacing scale */
   --s1: 4px;
@@ -54,8 +62,9 @@
   --t-xl: 23px;
   --t-2xl: 32px;
 
-  --radius: 4px;
-  --border: 2px solid var(--rim);
+  /* Pixel-art geometry: NO rounded corners anywhere structural. */
+  --px: 2px; /* one "pixel" of border weight */
+  --pixel-edge: var(--px) solid var(--rim);
   --mono: 'JetBrains Mono', 'SFMono-Regular', 'Consolas', ui-monospace, monospace;
   --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
@@ -76,12 +85,19 @@ body {
   font-size: var(--t-base);
   line-height: 1.5;
   color: var(--sand);
-  /* Dithered dot-grid texture over the canyon-night gradient to distinguish
-     surfaces without competing with run data. */
+  /* Dither dot-grid + faint horizontal scanlines over a warm dusk gradient.
+     Texture reads as "old display" without competing with run data. */
   background:
-    radial-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px) 0 0 / 6px 6px,
-    radial-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px) 3px 3px / 6px 6px,
-    linear-gradient(180deg, #2b2440 0%, var(--night) 45%, #1c1729 100%);
+    repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.06) 0,
+      rgba(0, 0, 0, 0.06) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
+    radial-gradient(rgba(255, 224, 180, 0.05) 1px, transparent 1px) 0 0 / 6px 6px,
+    radial-gradient(rgba(255, 224, 180, 0.03) 1px, transparent 1px) 3px 3px / 6px 6px,
+    linear-gradient(180deg, #3a241b 0%, var(--night) 48%, #1c100b 100%);
   background-attachment: fixed;
 }
 
@@ -89,11 +105,18 @@ img {
   image-rendering: pixelated; /* crisp pixel-art rendering for sprites & shots */
 }
 
+svg.sprite,
+svg.mark,
+svg.wordmark-svg,
+svg.pixel-canyon {
+  image-rendering: pixelated;
+}
+
 h1,
 h2,
 h3 {
   font-family: var(--mono);
-  letter-spacing: 0.06em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   margin: 0;
 }
@@ -103,35 +126,51 @@ pre {
   font-family: var(--mono);
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Chunky pixel-stepped button (hard offset shadow = "key cap"). */
 button {
   font-family: var(--mono);
   font-size: var(--t-sm);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink);
   background: var(--sun);
-  border: 2px solid #b8892f;
-  border-radius: var(--radius);
+  border: var(--px) solid #8a5a16;
+  border-radius: 0;
   padding: var(--s2) var(--s4);
   cursor: pointer;
-  box-shadow: 0 2px 0 #8a6520;
+  box-shadow: 0 var(--px) 0 #6e4410, var(--px) 0 0 #6e4410, calc(-1 * var(--px)) 0 0 #6e4410;
 }
 button:hover:not(:disabled) {
-  filter: brightness(1.06);
+  filter: brightness(1.07);
 }
 button:active:not(:disabled) {
-  transform: translateY(2px);
-  box-shadow: none;
+  transform: translateY(var(--px));
+  box-shadow: var(--px) 0 0 #6e4410, calc(-1 * var(--px)) 0 0 #6e4410;
 }
 button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
+button:focus-visible {
+  outline: var(--px) dashed var(--sand);
+  outline-offset: var(--px);
+}
 button.secondary {
   color: var(--sand);
   background: var(--night-3);
   border-color: var(--rim);
-  box-shadow: 0 2px 0 #1c1729;
 }
 
 /* ---- Layout ------------------------------------------------------------- */
@@ -146,30 +185,30 @@ button.secondary {
   align-items: center;
   gap: var(--s4);
   padding: var(--s3) var(--s5);
-  border-bottom: var(--border);
+  border-bottom: var(--px) solid var(--rim);
+  /* lit top edge -> shadow, like a sunlit rim */
   background: linear-gradient(180deg, var(--night-2), var(--night));
+  box-shadow: inset 0 var(--px) 0 var(--rim-bright);
 }
 .brand {
   display: flex;
   flex-direction: column;
+  gap: var(--s1);
 }
 .wordmark {
-  font-family: var(--mono);
-  font-size: var(--t-xl);
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--sand);
+  display: block;
+  line-height: 0;
   margin: 0;
 }
-.wordmark b {
-  color: var(--sun);
+.wordmark-svg {
+  display: block;
 }
 .tagline {
-  color: var(--sand-dim);
+  color: var(--sun);
+  font-family: var(--mono);
   font-size: var(--t-xs);
-  letter-spacing: 0.04em;
+  font-weight: 600;
+  letter-spacing: 0.22em;
 }
 .topbar .spacer {
   flex: 1;
@@ -181,18 +220,30 @@ button.secondary {
   gap: var(--s2);
   font-family: var(--mono);
   font-size: var(--t-xs);
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--sand-dim);
 }
+/* Square pixel status dots. */
 .dot {
-  width: 9px;
-  height: 9px;
-  border: 1px solid #00000044;
+  width: 8px;
+  height: 8px;
+  border: var(--px) solid #00000055;
 }
 .dot.open {
   background: var(--turquoise);
-  box-shadow: 0 0 8px var(--turquoise);
+  box-shadow: 0 0 6px var(--turquoise);
+  /* Beacon pulse so "live" is obvious at a glance. */
+  animation: beacon 1.4s ease-in-out infinite;
+}
+@keyframes beacon {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(47, 168, 154, 0.7), 0 0 6px var(--turquoise);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(47, 168, 154, 0), 0 0 10px var(--turquoise);
+  }
 }
 .dot.connecting {
   background: var(--sun);
@@ -200,13 +251,29 @@ button.secondary {
 .dot.closed {
   background: var(--canyon-red);
 }
+.live-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: var(--s1);
+  border: 1px solid #00000066;
+}
+.live-dot.open {
+  background: var(--turquoise);
+}
+.live-dot.connecting {
+  background: var(--sun);
+}
+.live-dot.closed {
+  background: var(--canyon-red);
+}
 
 .layout {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 280px minmax(0, 1fr);
   gap: var(--s5);
   padding: var(--s5);
-  max-width: 1280px;
+  max-width: 1320px;
   width: 100%;
   margin: 0 auto;
 }
@@ -218,14 +285,18 @@ button.secondary {
 
 .panel {
   background: var(--night-2);
-  border: var(--border);
-  border-radius: var(--radius);
+  border: var(--px) solid var(--rim);
+  border-radius: 0;
   padding: var(--s4);
+  box-shadow: inset 0 var(--px) 0 #00000040;
 }
 .panel h2 {
   font-size: var(--t-sm);
-  color: var(--sand-dim);
+  color: var(--sun);
   margin-bottom: var(--s3);
+  /* pixel underline */
+  padding-bottom: var(--s2);
+  border-bottom: var(--px) dashed var(--rim);
 }
 
 /* ---- Run history -------------------------------------------------------- */
@@ -245,45 +316,208 @@ button.secondary {
   font-family: var(--sans);
   color: var(--sand);
   background: var(--night-3);
-  border: 1px solid var(--rim);
+  border: var(--px) solid var(--rim);
   box-shadow: none;
   padding: var(--s2) var(--s3);
+  display: block;
+}
+.runlist li button:hover:not(.active) {
+  filter: brightness(1.08);
 }
 .runlist li button.active {
-  border-color: var(--turquoise);
+  border-color: var(--sun);
+  box-shadow: inset 0 0 0 var(--px) #00000040;
+  background: var(--night-2);
+}
+.runlist .runlist-title {
+  display: block;
+  font-family: var(--mono);
+  font-size: var(--t-sm);
+  letter-spacing: 0.04em;
+  color: var(--sand);
 }
 .runlist .when {
   display: block;
   font-family: var(--mono);
   font-size: var(--t-xs);
   color: var(--sand-dim);
+  margin-top: var(--s1);
 }
 .runlist .chips {
   display: flex;
   gap: var(--s1);
-  margin-top: var(--s1);
+  margin-top: var(--s2);
   flex-wrap: wrap;
 }
 
-/* ---- Canyon strata ------------------------------------------------------ */
+/* ---- Populated run layout: the canyon STRUCTURES the view ----------------
+   Three columns: a vertical pixel cliff-face spine the run descends, the wide
+   strata column (rows seated into the wall), and a right-side depth/elapsed
+   gauge. This uses the full width so there is no dead brown void at 1440px. */
+.canyon-grid {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 150px;
+  gap: 0;
+  align-items: stretch;
+  border: var(--px) solid var(--chip);
+  background: var(--chip);
+}
+/* The cliff-face spine: a tall pixel wall the descending sun marker runs down. */
+.canyon-spine-col {
+  position: relative;
+  background: var(--strata-8);
+  border-right: var(--px) solid #00000066;
+  box-shadow: inset calc(-1 * var(--px)) 0 0 rgba(255, 240, 210, 0.18);
+  min-height: 100%;
+}
+.canyon-spine {
+  display: block;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+  image-rendering: pixelated;
+}
+.canyon-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+/* Right rail: a stacked depth + elapsed gauge carved into the canyon edge. */
+.depth-gauge {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  padding: var(--s4) var(--s3);
+  background: linear-gradient(180deg, var(--night-2), var(--night));
+  border-left: var(--px) solid #00000066;
+  box-shadow: inset var(--px) 0 0 rgba(255, 240, 210, 0.12);
+}
+.gauge-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.gauge-num {
+  font-family: var(--mono);
+  font-size: var(--t-2xl);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--sun-bright);
+  letter-spacing: 0.02em;
+}
+.gauge-lab {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--sand-dim);
+}
+.gauge-status {
+  margin-top: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--sand-dim);
+  padding-top: var(--s3);
+  border-top: var(--px) dashed var(--rim);
+}
+.gauge-status.is-live {
+  color: var(--turquoise-bright);
+}
+@media (max-width: 720px) {
+  .canyon-grid {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+  .depth-gauge {
+    display: none; /* gauge folds away on narrow screens; strata stay legible */
+  }
+}
+
+/* ---- Canyon strata: a layered rock-wall spine ---------------------------
+   Each row is one rock layer. A carved "wall" column on the left stacks into a
+   continuous cliff face (named depth labels); the stage content sits beside it.
+   Hard pixel edges, a lit top edge + shadowed bottom edge = chiseled stone. */
 .canyon {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 0; /* layers stack flush like real strata */
+}
+.strata-empty {
+  padding: var(--s4);
 }
 .strata {
   position: relative;
-  border: 2px solid #00000033;
-  border-radius: var(--radius);
-  padding: var(--s3) var(--s4);
-  color: #1c1422;
   display: grid;
-  grid-template-columns: 28px 1fr auto;
+  grid-template-columns: 84px 40px minmax(0, 1fr) auto auto auto;
   align-items: center;
   gap: var(--s3);
+  width: 100%;
+  text-align: left;
+  padding: var(--s3) var(--s4) var(--s3) 0;
+  color: var(--ink);
   cursor: default;
+  /* chiseled top-lit / bottom-shadow edges between layers */
+  box-shadow: inset 0 var(--px) 0 rgba(255, 240, 210, 0.22),
+    inset 0 calc(-1 * var(--px)) 0 rgba(0, 0, 0, 0.35);
   overflow: hidden;
 }
+/* When the row is a real <button>, strip the key-cap button chrome so it still
+   reads as a stone layer (the rock styling above wins). */
+.strata.strata-btn {
+  font: inherit;
+  letter-spacing: normal;
+  text-transform: none;
+  background-clip: padding-box;
+  border: none;
+  border-radius: 0;
+}
+.strata.strata-btn:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+.strata.strata-btn:active:not(:disabled) {
+  transform: none;
+}
+/* The carved wall column: a stone block with a depth label etched into it. */
+.strata-wall {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--s2);
+  background: rgba(0, 0, 0, 0.22);
+  border-right: var(--px) solid rgba(0, 0, 0, 0.4);
+  box-shadow: inset calc(-1 * var(--px)) 0 0 rgba(255, 240, 210, 0.15);
+}
+.strata-depth {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 240, 210, 0.85);
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+}
+.strata-sprite {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.strata-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* Strata colors — one continuous depth sequence, sunlit rim (top of pipeline)
+   down to bedrock (decision). Each stage owns its own layer; none are reused. */
 .strata.s-spec {
   background: var(--strata-1);
 }
@@ -303,51 +537,146 @@ button.secondary {
   color: var(--sand);
 }
 .strata.s-repair {
-  background: var(--strata-repair);
+  background: var(--strata-6);
   color: var(--sand);
 }
 .strata.s-pr {
-  background: var(--strata-2);
+  background: var(--strata-7);
+  color: var(--sand);
 }
 .strata.s-decision {
-  background: var(--strata-6);
+  background: var(--strata-8);
   color: var(--sand);
 }
 .strata.clickable {
   cursor: pointer;
 }
 .strata.clickable:hover {
-  filter: brightness(1.05);
+  filter: brightness(1.06);
 }
-.strata .glyph {
-  font-family: var(--mono);
-  font-size: var(--t-lg);
-  text-align: center;
+.strata.clickable:focus-visible {
+  outline: var(--px) dashed var(--sand);
+  outline-offset: calc(-2 * var(--px));
 }
 .strata .stage {
   font-family: var(--mono);
   font-size: var(--t-xs);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  opacity: 0.75;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  opacity: 0.82;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
 }
 .strata .label {
   font-size: var(--t-base);
+  line-height: 1.35;
 }
+.scenario-note {
+  font-size: var(--t-sm);
+  opacity: 0.8;
+}
+/* Failure-category tag shown on the strata FACE (regression vs copy-change). */
+.strata-tag {
+  justify-self: end;
+}
+.disclose {
+  font-family: var(--mono);
+  font-size: var(--t-base);
+  padding-right: var(--s3);
+  transition: transform 0.12s ease;
+  opacity: 0.7;
+}
+.disclose.open {
+  transform: rotate(90deg);
+}
+/* A visible "this layer has evidence to dig into" affordance: a chiseled chip
+   around the disclosure arrow, lit on hover so the row clearly invites a click. */
+.strata.clickable .disclose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  opacity: 0.85;
+  background: rgba(0, 0, 0, 0.25);
+  border: var(--px) solid rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 var(--px) 0 rgba(255, 240, 210, 0.18);
+  margin-right: var(--s2);
+}
+.strata.clickable:hover .disclose {
+  background: rgba(0, 0, 0, 0.38);
+  opacity: 1;
+}
+
+/* Regression = a fault line in the rock: a hard sun/red fracture edge so a real
+   product regression stands out from the surrounding strata at a glance. */
+.strata.is-regression {
+  box-shadow: inset 0 var(--px) 0 rgba(255, 240, 210, 0.22),
+    inset 0 calc(-1 * var(--px)) 0 rgba(0, 0, 0, 0.35),
+    inset 4px 0 0 var(--canyon-red), inset 6px 0 0 rgba(0, 0, 0, 0.5);
+}
+.strata.is-regression .label {
+  font-weight: 600;
+}
+
+/* status-tinted left rail so verdict reads down the wall edge */
+.strata.status-pass .strata-wall {
+  box-shadow: inset calc(-1 * var(--px)) 0 0 var(--turquoise-bright);
+}
+.strata.status-fail .strata-wall {
+  box-shadow: inset calc(-1 * var(--px)) 0 0 var(--canyon-red-bright);
+}
+
+/* Mini repaired/refused pill used inside the scenario stage line. */
+.mini-pill {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 1px 5px;
+  border: 1px solid currentColor;
+}
+.mini-ok {
+  color: var(--turquoise-bright);
+}
+.mini-no {
+  color: var(--canyon-red-bright);
+}
+
 /* Badges sit on a solid dark neutral chip — never on the warm strata color —
    so small-text contrast clears 4.5:1 regardless of the layer underneath. */
 .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
   font-family: var(--mono);
   font-size: var(--t-xs);
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 2px var(--s2);
-  border-radius: 2px;
+  letter-spacing: 0.08em;
+  padding: 3px var(--s2);
+  border-radius: 0;
   background: var(--chip);
-  border: 1px solid #00000066;
+  border: var(--px) solid #00000066;
   color: var(--sand);
   white-space: nowrap;
+}
+.badge .mark {
+  flex: none;
+}
+.mark-pass {
+  fill: var(--turquoise-bright);
+}
+.mark-fail {
+  fill: var(--canyon-red-bright);
+}
+.mark-start {
+  fill: var(--sun-bright);
+}
+.mark-info {
+  fill: var(--sand-dim);
 }
 .badge.pass {
   color: var(--turquoise-bright);
@@ -365,14 +694,25 @@ button.secondary {
   color: var(--sand-dim);
   border-color: var(--rim);
 }
+
+/* active = currently-running layer: a smooth linear "stone scan" sweeping a
+   band of light across the layer (no strobe; continuous linear timing). */
 .strata.active::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, #ffffff22, transparent);
-  animation: shimmer 1.2s linear infinite;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 240, 210, 0.05) 35%,
+    rgba(255, 240, 210, 0.32) 50%,
+    rgba(255, 240, 210, 0.05) 65%,
+    transparent 100%
+  );
+  animation: stone-scan 1.8s linear infinite;
+  pointer-events: none;
 }
-@keyframes shimmer {
+@keyframes stone-scan {
   from {
     transform: translateX(-100%);
   }
@@ -384,9 +724,9 @@ button.secondary {
 /* ---- Evidence ----------------------------------------------------------- */
 .evidence {
   background: var(--night);
-  border: 1px solid var(--rim);
-  border-radius: var(--radius);
-  margin: 3px 0 var(--s2);
+  border: var(--px) solid var(--rim);
+  border-top: none;
+  margin: 0 0 var(--s3);
   padding: var(--s4);
   color: var(--sand);
   display: grid;
@@ -398,7 +738,7 @@ button.secondary {
 }
 .evidence h3 {
   font-size: var(--t-sm);
-  color: var(--sand-dim);
+  color: var(--sun);
 }
 .shot-grid {
   display: grid;
@@ -413,8 +753,8 @@ button.secondary {
 }
 .evidence img {
   max-width: 100%;
-  border: 2px solid var(--rim);
-  border-radius: var(--radius);
+  border: var(--px) solid var(--rim);
+  border-radius: 0;
 }
 .evidence figcaption {
   font-family: var(--mono);
@@ -436,9 +776,9 @@ button.secondary {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 2px var(--s2);
-  border-radius: 2px;
+  border-radius: 0;
   background: var(--chip);
-  border: 1px solid var(--rim);
+  border: var(--px) solid var(--rim);
 }
 .pill-ok {
   color: var(--turquoise-bright);
@@ -456,9 +796,9 @@ button.secondary {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 2px var(--s2);
-  border-radius: 2px;
+  border-radius: 0;
   background: var(--chip);
-  border: 1px solid var(--rim);
+  border: var(--px) solid var(--rim);
 }
 .tag-regression {
   color: var(--canyon-red-bright);
@@ -471,9 +811,9 @@ button.secondary {
 .evidence pre {
   margin: 0;
   padding: var(--s3);
-  background: #160f20;
-  border: 1px solid var(--rim);
-  border-radius: var(--radius);
+  background: #160c08;
+  border: var(--px) solid var(--rim);
+  border-radius: 0;
   font-size: var(--t-xs);
   overflow: auto;
   max-height: 320px;
@@ -486,8 +826,9 @@ button.secondary {
 }
 .reason {
   color: var(--sand);
-  border-left: 3px solid var(--turquoise);
+  border-left: var(--px) solid var(--turquoise);
   padding-left: var(--s3);
+  margin: 0;
 }
 
 /* ---- Empty / hero ------------------------------------------------------- */
@@ -510,19 +851,19 @@ button.secondary {
   font-size: var(--t-sm);
 }
 
-/* ---- Pixel art ---------------------------------------------------------- */
+/* ---- Pixel art hero canyon --------------------------------------------- */
 .pixel-canyon {
   display: block;
   width: 100%;
-  height: 180px;
+  height: 220px;
   image-rendering: pixelated;
-  border-bottom: 2px solid var(--rim);
-  /* dusk sky behind the mesa silhouette */
-  background: linear-gradient(180deg, #3a3158 0%, #6e466b 60%, #a04a35 100%);
+  border-bottom: var(--px) solid var(--rim);
+  /* dusk sky behind the scene, expressed via tokens (no duplicated hex). */
+  background: linear-gradient(180deg, var(--dusk-rose) 0%, var(--dusk-amber) 55%, var(--strata-3) 100%);
 }
 @media (max-width: 880px) {
   .pixel-canyon {
-    height: 130px;
+    height: 150px;
   }
 }
 .stream-note {
@@ -558,8 +899,8 @@ button.secondary {
   text-transform: uppercase;
   color: var(--sand);
   padding: var(--s2) var(--s3);
-  border-radius: var(--radius);
-  border: 1px solid var(--rim);
+  border-radius: 0;
+  border: var(--px) solid var(--rim);
   background: var(--chip);
 }
 .liveness-connecting {
@@ -569,60 +910,125 @@ button.secondary {
   border-color: #7a2a1f;
 }
 
-/* ---- Verdict banner ----------------------------------------------------- */
-.verdict {
+/* ---- Past run header ---------------------------------------------------- */
+.past-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s3);
+  flex-wrap: wrap;
+}
+.past-title {
+  font-size: var(--t-lg);
+  color: var(--sand);
+}
+.past-spec {
+  font-family: var(--mono);
+  font-size: var(--t-sm);
+  color: var(--sun);
+  letter-spacing: 0.04em;
+}
+
+/* ---- Verdict: a carved bedrock slab at the canyon floor -----------------
+   This is the final stratum: a chiseled stone band, not a status alert. It is
+   seated flush under the strata (no gap), with a thin stratigraphy strip on top
+   echoing the rock layers and a recessed status stamp etched into the stone. */
+.slab {
+  position: relative;
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--s4);
+  padding: var(--s4) var(--s4) var(--s4) var(--s5);
+  background: linear-gradient(180deg, #2e1b13 0%, var(--strata-8) 100%);
+  border-top: var(--px) solid #00000080;
+  box-shadow: inset 0 var(--px) 0 rgba(255, 240, 210, 0.18);
+  overflow: hidden;
+}
+/* Thin banded stratigraphy strip across the very top of the slab. */
+.slab-strata {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 5px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--strata-1) 0 6px,
+    var(--strata-3) 6px 12px,
+    var(--strata-5) 12px 18px,
+    var(--strata-8) 18px 24px
+  );
+  opacity: 0.55;
+  border-bottom: var(--px) solid #00000066;
+}
+/* A status-keyed light bleeds up the left edge like mineral staining. */
+.slab::before {
+  content: '';
+  position: absolute;
+  top: 5px;
+  bottom: 0;
+  left: 0;
+  width: 5px;
+}
+.slab-error::before {
+  background: var(--canyon-red);
+}
+.slab-repaired::before {
+  background: var(--turquoise);
+}
+.slab-guarded::before {
+  background: var(--sun);
+}
+/* Recessed stamp carved into the stone. */
+.slab-stamp {
   display: flex;
   align-items: center;
-  gap: var(--s3);
-  padding: var(--s3) var(--s4);
-  border-radius: var(--radius);
-  border: 2px solid var(--rim);
-  /* solid dark base + a left color rail set per-tone below */
-  background: var(--chip-2);
-  border-left-width: 6px;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  background: rgba(0, 0, 0, 0.32);
+  border: var(--px) solid #00000080;
+  box-shadow: inset 0 var(--px) 0 rgba(0, 0, 0, 0.6),
+    inset 0 calc(-1 * var(--px)) 0 rgba(255, 240, 210, 0.12);
+  flex: none;
 }
-.verdict-error {
-  border-left-color: var(--canyon-red);
+.slab-error .slab-stamp .mark {
+  fill: var(--canyon-red-bright);
 }
-.verdict-repaired {
-  border-left-color: var(--turquoise);
+.slab-repaired .slab-stamp .mark {
+  fill: var(--turquoise-bright);
 }
-.verdict-guarded {
-  border-left-color: var(--sun);
+.slab-guarded .slab-stamp .mark {
+  fill: var(--sun-bright);
 }
-.verdict-mark {
-  font-family: var(--mono);
-  font-size: var(--t-2xl);
-  line-height: 1;
-}
-.verdict-error .verdict-mark {
-  color: var(--canyon-red-bright);
-}
-.verdict-repaired .verdict-mark {
-  color: var(--turquoise-bright);
-}
-.verdict-guarded .verdict-mark {
-  color: var(--sun-bright);
-}
-.verdict-body {
+.slab-body {
   display: grid;
   gap: var(--s1);
+  min-width: 0;
 }
-.verdict-headline {
+.slab-kicker {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--sand-dim);
+}
+.slab-headline {
   font-family: var(--mono);
   font-size: var(--t-lg);
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--sand);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
 }
-.verdict-detail {
+.slab-detail {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--s2);
 }
-.verdict-note {
+.slab-note {
   color: var(--sand-dim);
   font-size: var(--t-sm);
 }
@@ -636,14 +1042,14 @@ button.secondary {
   display: grid;
   gap: var(--s2);
   padding: var(--s2) var(--s3);
-  border: 1px solid var(--rim);
-  border-radius: var(--radius);
+  border: var(--px) solid var(--rim);
+  border-radius: 0;
   background: var(--night-3);
 }
 .skeleton {
   display: block;
-  border-radius: 2px;
-  background: linear-gradient(90deg, var(--rim) 0%, #5a4d76 50%, var(--rim) 100%);
+  border-radius: 0;
+  background: linear-gradient(90deg, var(--rim) 0%, #7a4a30 50%, var(--rim) 100%);
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.3s ease-in-out infinite;
 }
@@ -666,7 +1072,18 @@ button.secondary {
 }
 @media (prefers-reduced-motion: reduce) {
   .skeleton,
-  .strata.active::after {
+  .strata.active::after,
+  .dot.open {
     animation: none;
+  }
+  /* Without the scan animation, mark the active layer with a solid sun-colored
+     inset border so it is still unmistakably "the one running right now". */
+  .strata.active {
+    box-shadow: inset 0 0 0 2px var(--sun),
+      inset 0 var(--px) 0 rgba(255, 240, 210, 0.22),
+      inset 0 calc(-1 * var(--px)) 0 rgba(0, 0, 0, 0.35);
+  }
+  .strata.active::after {
+    display: none;
   }
 }

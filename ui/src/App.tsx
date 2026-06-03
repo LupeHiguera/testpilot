@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getRun, listRuns, triggerRun } from './api';
 import { useEventStream } from './useEventStream';
 import { PixelCanyon } from './PixelCanyon';
+import { CanyonSpine } from './CanyonSpine';
+import { PixelWordmark } from './PixelWordmark';
+import { StageSprite, StatusMark } from './PixelSprites';
 import type { PipelineEvent, RunSummary, Stage, Status } from './types';
 
-const STATUS_GLYPH: Record<Status, string> = { start: '▶', pass: '✓', fail: '✕', info: '•' };
 const STAGE_NAME: Record<Stage, string> = {
   spec: 'Spec',
   observe: 'Observe',
@@ -14,6 +16,18 @@ const STAGE_NAME: Record<Stage, string> = {
   repair: 'Repair',
   pr: 'PR',
   decision: 'Decision'
+};
+
+// Each pipeline stage maps to a named rock layer for the strata legend / depth cue.
+const STAGE_DEPTH: Record<Stage, string> = {
+  spec: 'Rim',
+  observe: 'Caprock',
+  generate: 'Sandstone',
+  run: 'Shale',
+  diagnose: 'Limestone',
+  repair: 'Schist',
+  pr: 'Ledge',
+  decision: 'Bedrock'
 };
 
 const CONNECTION_NOTE: Record<string, string> = {
@@ -75,8 +89,11 @@ export function App() {
     <div className="app">
       <header className="topbar">
         <div className="brand">
-          <h1 className="wordmark">test<b>pilot</b></h1>
-          <div className="tagline">agentic QA · live canyon view</div>
+          <h1 className="wordmark">
+            <PixelWordmark scale={2.2} />
+            <span className="sr-only">testpilot</span>
+          </h1>
+          <div className="tagline">AGENTIC&nbsp;QA · LIVE&nbsp;CANYON&nbsp;VIEW</div>
         </div>
         <div className="spacer" />
         <span className="conn" role="status">
@@ -89,12 +106,14 @@ export function App() {
 
       <div className="layout">
         <aside className="panel" aria-label="Run history">
-          <h2>Runs</h2>
+          <h2>Expeditions</h2>
           {runsError && <p className="muted">Couldn’t load runs: {runsError}</p>}
           <ul className="runlist">
             <li>
               <button className={selected === null ? 'active' : ''} onClick={() => setSelected(null)}>
-                ● Live view
+                <span className="runlist-title">
+                  <span className={`live-dot ${connection}`} aria-hidden /> Live view
+                </span>
               </button>
             </li>
             {runsLoading && !runsError ? (
@@ -109,12 +128,15 @@ export function App() {
                 {runs.map((run) => (
                   <li key={run.runId}>
                     <button className={selected === run.runId ? 'active' : ''} onClick={() => setSelected(run.runId)}>
-                      {run.runId.replace(/^demo-/, '').replace(/T/, ' ').replace(/-\d+Z$/, '')}
+                      <span className="runlist-title">
+                        {run.runId.replace(/^demo-/, '').replace(/T/, ' ').replace(/-\d+Z$/, '')}
+                      </span>
                       <span className="when">{new Date(run.createdAt).toLocaleString()}</span>
                       {run.summary && (
                         <span className="chips">
-                          <Chip text={run.summary.copyChange ?? '—'} kind="pass" />
-                          <Chip text={run.summary.regression ?? '—'} kind="fail" />
+                          {run.summary.copyChange && <Chip text={run.summary.copyChange} kind="pass" />}
+                          {run.summary.regression && <Chip text={run.summary.regression} kind="fail" />}
+                          <Chip text={run.summary.repairApplied ? 'repaired' : 'guarded'} kind={run.summary.repairApplied ? 'pass' : 'info'} />
                         </span>
                       )}
                     </button>
@@ -178,49 +200,78 @@ function deriveVerdict(events: PipelineEvent[]) {
   };
 }
 
-function VerdictBanner({ events }: { events: PipelineEvent[] }) {
-  const verdict = deriveVerdict(events);
-  if (!verdict) {
-    return null;
-  }
-  const { category, repairApplied, repairRefused, failed, done } = verdict;
-  const tone = failed ? 'error' : repairApplied ? 'repaired' : 'guarded';
-  const headline = failed
-    ? 'Run failed'
-    : repairApplied
-      ? 'Repair applied'
-      : repairRefused
-        ? 'Repair refused'
-        : done
-          ? 'Run complete'
-          : 'In progress';
+interface VerdictView {
+  tone: 'error' | 'repaired' | 'guarded';
+  mark: Status;
+  headline: string;
+  category?: string;
+  note: string;
+}
 
+/**
+ * The verdict reads as a carved bedrock slab at the canyon floor — a chiseled
+ * stone band with an etched status stamp, not a Bootstrap alert. The thin
+ * stratigraphy strip on top ties it visually to the rock layers above it.
+ */
+function VerdictBanner({ view }: { view: VerdictView | null }) {
+  if (!view) return null;
+  const { tone, mark, headline, category, note } = view;
   return (
-    <div className={`verdict verdict-${tone}`} role="status">
-      <span className="verdict-mark" aria-hidden>
-        {failed ? '✕' : repairApplied ? '✓' : '⚠'}
-      </span>
-      <div className="verdict-body">
-        <div className="verdict-headline">{headline}</div>
-        <div className="verdict-detail">
+    <div className={`slab slab-${tone}`} role="status">
+      <div className="slab-strata" aria-hidden />
+      <div className="slab-stamp" aria-hidden>
+        <StatusMark status={mark} size={34} />
+      </div>
+      <div className="slab-body">
+        <div className="slab-kicker">Bedrock · verdict</div>
+        <div className="slab-headline">{headline}</div>
+        <div className="slab-detail">
           {category && (
             <span className={`tag tag-${category === 'PRODUCT_REGRESSION' ? 'regression' : 'copy'}`}>
               {category.replace(/_/g, ' ')}
             </span>
           )}
-          <span className="verdict-note">
-            {repairApplied
-              ? 'Safe copy-change auto-repaired; regression refused.'
-              : repairRefused
-                ? 'Change refused — would weaken the test.'
-                : done
-                  ? 'See strata below for full evidence.'
-                  : 'Awaiting the decision strata…'}
-          </span>
+          <span className="slab-note">{note}</span>
         </div>
       </div>
     </div>
   );
+}
+
+function verdictFromLive(events: PipelineEvent[]): VerdictView | null {
+  const v = deriveVerdict(events);
+  if (!v) return null;
+  const { category, repairApplied, repairRefused, failed, done } = v;
+  const tone = failed ? 'error' : repairApplied ? 'repaired' : 'guarded';
+  return {
+    tone,
+    mark: failed ? 'fail' : repairApplied ? 'pass' : 'info',
+    headline: failed
+      ? 'Run failed'
+      : repairApplied
+        ? 'Repair applied'
+        : repairRefused
+          ? 'Repair refused'
+          : done
+            ? 'Run complete'
+            : 'In progress',
+    category,
+    note: repairApplied
+      ? 'Safe copy-change auto-repaired; regression refused.'
+      : repairRefused
+        ? 'Change refused — would weaken the test.'
+        : done
+          ? 'See strata below for full evidence.'
+          : 'Awaiting the decision strata…'
+  };
+}
+
+/** Format a millisecond span as a compact elapsed clock (e.g. 0:04, 1:12). */
+function fmtElapsed(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
 function LiveCanyon({ events, connection }: { events: PipelineEvent[]; connection: string }) {
@@ -231,7 +282,7 @@ function LiveCanyon({ events, connection }: { events: PipelineEvent[]; connectio
         <div className="hero-copy">
           <h2>Watch a run descend the canyon</h2>
           <p className="muted">
-            Each pipeline stage forms a rock layer as it runs. Press <strong>Run demo</strong> to stream one live.
+            Each pipeline stage carves a rock layer as it runs. Press <strong>Run demo</strong> to stream one live.
           </p>
           <p className={`stream-note stream-${connection}`}>
             <span className={`dot ${connection}`} aria-hidden /> {CONNECTION_NOTE[connection] ?? connection}
@@ -241,6 +292,15 @@ function LiveCanyon({ events, connection }: { events: PipelineEvent[]; connectio
     );
   }
   const degraded = connection !== 'open';
+  const activeIndex = events[events.length - 1].status === 'start' ? events.length - 1 : -1;
+  // The run "descends" to the deepest layer reached so far; the spine marker
+  // and the depth gauge both read off this.
+  const reached = events.length;
+  const startTs = events[0].ts;
+  const lastTs = events[events.length - 1].ts;
+  const elapsed = fmtElapsed(lastTs - startTs);
+  const running = activeIndex !== -1;
+
   return (
     <div className={`canyon-pane ${degraded ? 'degraded' : ''}`}>
       {degraded && (
@@ -248,11 +308,32 @@ function LiveCanyon({ events, connection }: { events: PipelineEvent[]; connectio
           <span className={`dot ${connection}`} aria-hidden /> {CONNECTION_NOTE[connection] ?? connection}
         </div>
       )}
-      <VerdictBanner events={events} />
-      <div className="canyon">
-        {events.map((event, index) => (
-          <Strata key={event.id} event={event} active={index === events.length - 1 && event.status === 'start'} />
-        ))}
+      <div className="canyon-grid">
+        <div className="canyon-spine-col" aria-hidden>
+          <CanyonSpine total={reached} reached={reached} rows={Math.max(24, reached * 3)} />
+        </div>
+        <div className="canyon-main">
+          <div className="canyon">
+            {events.map((event, index) => (
+              <Strata key={event.id} event={event} active={index === activeIndex} />
+            ))}
+          </div>
+          <VerdictBanner view={verdictFromLive(events)} />
+        </div>
+        <aside className="depth-gauge" aria-label="Run depth and elapsed time">
+          <div className="gauge-block">
+            <span className="gauge-num">{reached}</span>
+            <span className="gauge-lab">layers carved</span>
+          </div>
+          <div className="gauge-block">
+            <span className="gauge-num">{elapsed}</span>
+            <span className="gauge-lab">elapsed</span>
+          </div>
+          <div className={`gauge-status ${running ? 'is-live' : ''}`}>
+            <span className={`dot ${running ? 'open' : 'closed'}`} aria-hidden />
+            {running ? 'descending' : 'at rest'}
+          </div>
+        </aside>
       </div>
     </div>
   );
@@ -262,25 +343,64 @@ function Strata({ event, active }: { event: PipelineEvent; active: boolean }) {
   const [open, setOpen] = useState(false);
   const evidence = collectEvidence(event);
   const hasEvidence = Boolean(evidence);
+  // Surface the failure category on the row FACE (not just when expanded), and
+  // flag a regression so the row gets a stronger geological "fault line" break.
+  const category = evidence?.diagnosis?.category;
+  const isRegression = category === 'PRODUCT_REGRESSION';
+  const faceClass = [
+    'strata',
+    `s-${event.stage}`,
+    `status-${event.status}`,
+    active ? 'active' : '',
+    hasEvidence ? 'clickable' : '',
+    isRegression ? 'is-regression' : ''
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const content = (
+    <>
+      <span className="strata-wall" aria-hidden>
+        <span className="strata-depth">{STAGE_DEPTH[event.stage]}</span>
+      </span>
+      <span className="strata-sprite" aria-hidden>
+        <StageSprite stage={event.stage} size={28} />
+      </span>
+      <span className="strata-text">
+        <span className="stage">{STAGE_NAME[event.stage]}</span>
+        <span className="label">{event.label}</span>
+      </span>
+      {category && (
+        <span className={`tag tag-${isRegression ? 'regression' : 'copy'} strata-tag`}>
+          {category.replace(/_/g, ' ')}
+        </span>
+      )}
+      <span className={`badge ${event.status}`}>
+        <StatusMark status={event.status} size={13} />
+        {event.status}
+      </span>
+      {hasEvidence && (
+        <span className={`disclose ${open ? 'open' : ''}`} aria-hidden>
+          ▸
+        </span>
+      )}
+    </>
+  );
+
   return (
     <>
-      <div
-        className={`strata s-${event.stage} ${active ? 'active' : ''} ${hasEvidence ? 'clickable' : ''}`}
-        onClick={hasEvidence ? () => setOpen((value) => !value) : undefined}
-        role={hasEvidence ? 'button' : undefined}
-        tabIndex={hasEvidence ? 0 : undefined}
-        onKeyDown={hasEvidence ? (e) => (e.key === 'Enter' || e.key === ' ') && setOpen((v) => !v) : undefined}
-        aria-expanded={hasEvidence ? open : undefined}
-      >
-        <span className="glyph" aria-hidden>
-          {STATUS_GLYPH[event.status]}
-        </span>
-        <span>
-          <span className="stage">{STAGE_NAME[event.stage]}</span>
-          <div className="label">{event.label}</div>
-        </span>
-        <span className={`badge ${event.status}`}>{event.status}</span>
-      </div>
+      {hasEvidence ? (
+        <button
+          type="button"
+          className={`${faceClass} strata-btn`}
+          onClick={() => setOpen((value) => !value)}
+          aria-expanded={open}
+        >
+          {content}
+        </button>
+      ) : (
+        <div className={faceClass}>{content}</div>
+      )}
       {open && evidence && <Evidence {...evidence} />}
     </>
   );
@@ -314,26 +434,30 @@ function collectEvidence(event: PipelineEvent): EvidenceData | null {
   return { diagnosis, shots, diff };
 }
 
+function DiagnosisCard({ diagnosis }: { diagnosis: Diagnosis }) {
+  return (
+    <div className="evidence-block">
+      <h3>Diagnosis</h3>
+      <p className="diagnosis-line">
+        <span className={`tag tag-${diagnosis.category === 'PRODUCT_REGRESSION' ? 'regression' : 'copy'}`}>
+          {(diagnosis.category ?? 'UNKNOWN').replace(/_/g, ' ')}
+        </span>
+        {typeof diagnosis.confidence === 'number' && (
+          <span className="muted">confidence {diagnosis.confidence}</span>
+        )}
+        <span className={`pill ${diagnosis.repairable ? 'pill-ok' : 'pill-no'}`}>
+          {diagnosis.repairable ? 'repairable' : 'repair refused'}
+        </span>
+      </p>
+      {diagnosis.reason && <p className="reason">{diagnosis.reason}</p>}
+    </div>
+  );
+}
+
 function Evidence({ diagnosis, shots, diff }: EvidenceData) {
   return (
     <div className="evidence">
-      {diagnosis && (
-        <div className="evidence-block">
-          <h3>Diagnosis</h3>
-          <p className="diagnosis-line">
-            <span className={`tag tag-${diagnosis.category === 'PRODUCT_REGRESSION' ? 'regression' : 'copy'}`}>
-              {(diagnosis.category ?? 'UNKNOWN').replace(/_/g, ' ')}
-            </span>
-            {typeof diagnosis.confidence === 'number' && (
-              <span className="muted">confidence {diagnosis.confidence}</span>
-            )}
-            <span className={`pill ${diagnosis.repairable ? 'pill-ok' : 'pill-no'}`}>
-              {diagnosis.repairable ? 'repairable' : 'repair refused'}
-            </span>
-          </p>
-          {diagnosis.reason && <p className="reason">{diagnosis.reason}</p>}
-        </div>
-      )}
+      {diagnosis && <DiagnosisCard diagnosis={diagnosis} />}
       {shots.length > 0 && (
         <div className="evidence-block">
           <h3>Screenshots</h3>
@@ -369,43 +493,169 @@ function renderDiff(diff: string) {
   });
 }
 
+interface Scenario {
+  name: string;
+  passed: boolean;
+  diagnosis?: string;
+  repairApplied?: boolean;
+  note: string;
+}
+
+interface PastReport {
+  intent?: { name?: string; originalSpec?: string };
+  diagnosis?: Diagnosis;
+  repair?: { safeToApply?: boolean; reason?: string };
+  repairApplied?: boolean;
+  scenarios?: Scenario[];
+}
+
+/** Build a run-level verdict for history view from the static report.json. */
+function verdictFromReport(report: PastReport): VerdictView | null {
+  const scenarios = report.scenarios ?? [];
+  const regression = scenarios.find((s) => s.diagnosis === 'PRODUCT_REGRESSION');
+  const repaired = scenarios.find((s) => s.repairApplied);
+  const anyFail = scenarios.some((s) => !s.passed);
+  const category =
+    report.diagnosis?.category && report.diagnosis.category !== 'UNKNOWN'
+      ? report.diagnosis.category
+      : regression?.diagnosis ?? repaired?.diagnosis;
+
+  if (scenarios.length === 0 && !report.diagnosis) return null;
+
+  // A run that both repaired a copy-change AND refused a regression is the
+  // headline "guarded" success; a run with an unhandled failure is an error.
+  if (anyFail && !repaired) {
+    return {
+      tone: 'error',
+      mark: 'fail',
+      headline: 'Regression caught',
+      category,
+      note: 'A real product regression was detected; the test was not weakened.'
+    };
+  }
+  if (repaired) {
+    return {
+      tone: 'repaired',
+      mark: 'pass',
+      headline: 'Repaired & guarded',
+      category,
+      note: regression
+        ? 'Copy-change auto-repaired; the genuine regression was refused.'
+        : 'Safe copy-change auto-repaired.'
+    };
+  }
+  return {
+    tone: 'guarded',
+    mark: 'info',
+    headline: 'Run complete',
+    category,
+    note: report.repair?.reason ?? 'No repair was required.'
+  };
+}
+
 function PastRun({ runId }: { runId: string }) {
-  const [report, setReport] = useState<{ scenarios?: { name: string; passed: boolean; diagnosis?: string; note: string }[] } | null>(null);
+  const [report, setReport] = useState<PastReport | null>(null);
   const [error, setError] = useState<string>();
 
   useEffect(() => {
     setReport(null);
     setError(undefined);
     getRun(runId)
-      .then((data) => setReport((data.report as typeof report) ?? {}))
+      .then((data) => setReport((data.report as PastReport) ?? {}))
       .catch((e: Error) => setError(e.message));
   }, [runId]);
 
   if (error) {
-    return <div className="panel hero"><p className="muted">Couldn’t load this run: {error}</p></div>;
+    return (
+      <div className="panel hero">
+        <p className="muted">Couldn’t load this run: {error}</p>
+      </div>
+    );
   }
   if (!report) {
-    return <div className="panel hero"><p className="muted">Loading…</p></div>;
+    return (
+      <div className="panel hero">
+        <p className="muted">Loading…</p>
+      </div>
+    );
   }
+
+  const scenarios = report.scenarios ?? [];
+  const title = runId.replace(/^demo-/, '').replace(/T/, ' ').replace(/-\d+Z$/, '');
+
+  const depth = scenarios.length;
   return (
-    <div className="panel">
-      <h2>{runId}</h2>
-      <div className="canyon">
-        {(report.scenarios ?? []).map((scenario) => (
-          <div key={scenario.name} className={`strata s-${scenario.passed ? 'pr' : 'run'}`}>
-            <span className="glyph" aria-hidden>{scenario.passed ? '✓' : '✕'}</span>
-            <span>
-              <span className="stage">{scenario.diagnosis ?? 'scenario'}</span>
-              <div className="label">{scenario.name}</div>
-            </span>
-            <span className={`badge ${scenario.passed ? 'pass' : 'fail'}`}>{scenario.passed ? 'pass' : 'fail'}</span>
+    <div className="canyon-pane">
+      <div className="past-head">
+        <h2 className="past-title">{title}</h2>
+        {report.intent?.name && <span className="past-spec">{report.intent.name}</span>}
+      </div>
+      <div className="canyon-grid">
+        <div className="canyon-spine-col" aria-hidden>
+          <CanyonSpine total={depth} reached={depth} rows={Math.max(24, depth * 3)} />
+        </div>
+        <div className="canyon-main">
+          <div className="canyon">
+            {scenarios.length === 0 && <p className="muted strata-empty">No scenario detail recorded for this run.</p>}
+            {scenarios.map((scenario) => (
+              <ScenarioStrata key={scenario.name} scenario={scenario} />
+            ))}
           </div>
-        ))}
+          <VerdictBanner view={verdictFromReport(report)} />
+          {report.diagnosis && report.diagnosis.category !== 'UNKNOWN' && (
+            <div className="evidence">
+              <DiagnosisCard diagnosis={report.diagnosis} />
+            </div>
+          )}
+        </div>
+        <aside className="depth-gauge" aria-label="Run depth">
+          <div className="gauge-block">
+            <span className="gauge-num">{depth}</span>
+            <span className="gauge-lab">scenarios</span>
+          </div>
+          <div className="gauge-status">
+            <span className="dot closed" aria-hidden />
+            archived
+          </div>
+        </aside>
       </div>
     </div>
   );
 }
 
-function Chip({ text, kind }: { text: string; kind: 'pass' | 'fail' }) {
+/** A history scenario row, styled like a live strata layer so the views match. */
+function ScenarioStrata({ scenario }: { scenario: Scenario }) {
+  // Map the scenario to a representative stage so it gets a sprite + rock layer.
+  const stage: Stage = scenario.diagnosis === 'PRODUCT_REGRESSION' ? 'run' : scenario.repairApplied ? 'repair' : 'decision';
+  const status: Status = scenario.passed ? 'pass' : 'fail';
+  return (
+    <div className={`strata s-${stage} status-${status}`}>
+      <span className="strata-wall" aria-hidden>
+        <span className="strata-depth">{STAGE_DEPTH[stage]}</span>
+      </span>
+      <span className="strata-sprite" aria-hidden>
+        <StageSprite stage={stage} size={28} />
+      </span>
+      <span className="strata-text">
+        <span className="stage">
+          {scenario.diagnosis ? scenario.diagnosis.replace(/_/g, ' ') : 'scenario'}
+          {scenario.repairApplied !== undefined && (
+            <span className={`mini-pill ${scenario.repairApplied ? 'mini-ok' : 'mini-no'}`}>
+              {scenario.repairApplied ? 'repaired' : 'refused'}
+            </span>
+          )}
+        </span>
+        <span className="label">{scenario.name}</span>
+        <span className="scenario-note">{scenario.note}</span>
+      </span>
+      <span className={`badge ${status}`}>
+        <StatusMark status={status} size={13} />
+        {scenario.passed ? 'pass' : 'fail'}
+      </span>
+    </div>
+  );
+}
+
+function Chip({ text, kind }: { text: string; kind: 'pass' | 'fail' | 'info' }) {
   return <span className={`badge ${kind}`}>{text}</span>;
 }
