@@ -1,167 +1,255 @@
 # testpilot
-Turns plain-English QA instructions into Playwright tests, then diagnoses and repairs failures while preserving test intent.
 
-## MVP
+**Turn plain-English QA instructions into Playwright tests — then automatically diagnose and repair failures without weakening what the test was meant to check.**
 
-testpilot is a CLI-first agentic QA prototype. The current MVP includes:
+[![CI](https://github.com/LupeHiguera/testpilot/actions/workflows/ci.yml/badge.svg)](https://github.com/LupeHiguera/testpilot/actions/workflows/ci.yml)
 
-- A Vite React demo app with `/login` and `/dashboard`.
-- A TypeScript CLI for generating, running, diagnosing, and repairing Playwright tests.
-- Deterministic mock mode for local development and CI.
-- Optional OpenAI mode using `OPENAI_API_KEY` (verified end-to-end).
-- Failure classification for safe UI drift versus product regression.
-- Optional vision-assisted diagnosis (`--vision`) under a strict safety invariant.
-- Auto-application of safe repairs only inside `tests/generated/`.
-- Reviewable repair PR bundles, with optional one-command GitHub PRs (`--open-pr`).
+testpilot is an agentic QA tool. You describe a flow in everyday language ("go to
+`/login`, sign in, and check the dashboard shows the user's name"); it observes the
+running app, generates a Playwright test, runs it, and — when it fails — figures out
+**why**. The key idea is restraint: when the UI merely *drifted* (a button's label
+changed, a selector moved), it proposes a safe repair; when the *product* actually
+broke (login no longer reaches the dashboard), it **refuses to touch the test** and
+flags it for a human. A passing test suite stays meaningful instead of being quietly
+rubber-stamped green.
 
-## Install
+---
+
+## What it does
+
+- **Generate** Playwright tests from natural-language stories.
+- **Run** them against a live app and collect rich failure artifacts (error, screenshot, DOM, console, network).
+- **Diagnose** failures into one of eight categories — distinguishing safe UI drift from real product regressions.
+- **Repair** only safe drift, preserving the original assertions and intent; never weakening a test to make it pass.
+- **Review** every change behind a human-approval gate (a local PR bundle, or a one-command GitHub PR with before/after screenshots).
+- **Document** connected projects with living docs that are backed by — and kept honest by — the tests themselves.
+- **Connect** real projects and ingest stories from manual upload, **GitHub**, or **Jira** (via MCP).
+- **Watch** it all happen live in a Grand Canyon pixel-art dashboard.
+
+Two model backends: a deterministic **mock** mode (default — reproducible, no API key) and an **OpenAI** mode for real generation, repair, and vision-assisted diagnosis.
+
+---
+
+## How it works
+
+Every run flows through the same pipeline:
+
+```
+spec ─▶ observe ─▶ generate ─▶ run ─▶ diagnose ─▶ repair ─▶ report
+ │         │           │         │        │           │         │
+ NL     DOM +        Playwright  pass/   8-category  safe-only  markdown +
+ story  screenshot   test        fail    + vision    repair     PR bundle
+```
+
+1. **Parse** the story into a structured test intent.
+2. **Observe** the page (URL, DOM, accessibility info, screenshot, console, network).
+3. **Generate** a Playwright test grounded in the observed page.
+4. **Run** it; on failure, capture artifacts.
+5. **Diagnose** the failure category.
+6. **Repair** — only if the failure is safe drift the guardrails allow.
+7. **Report** the decision (and assemble a PR if a repair was applied).
+
+### The safety model
+
+This is the heart of testpilot. A repair is only ever applied when **every** guard agrees:
+
+- **Failure classifier** labels the failure as one of:
+  `SELECTOR_DRIFT`, `UI_COPY_CHANGE`, `TIMING_OR_FLAKE` (repairable) vs.
+  `PRODUCT_REGRESSION`, `APP_UNAVAILABLE`, `NETWORK_OR_API_FAILURE`,
+  `AUTH_OR_TEST_DATA_FAILURE`, `UNKNOWN` (not repairable — needs a human).
+- **Vision can veto, never authorize.** With `--vision`, a model reads the failure
+  screenshot, but its verdict is merged so it can only make the diagnosis *more*
+  cautious — it can downgrade a repair to "needs review," never upgrade a regression
+  into an auto-repair.
+- **Generated-test guard** refuses to write a test that drops the spec's route or
+  expected outcome, or that contains `.only`/`.skip`/`TODO`.
+- **Repair guard** refuses to remove assertions, change the expected business outcome,
+  or edit anything outside the generated-test directory.
+- **Human approval** — repairs are surfaced as a reviewable PR bundle or GitHub PR, never silently merged.
+
+---
+
+## Quick start
+
+Requires Node 20+.
 
 ```bash
 npm install
-npm run playwright:install
-```
+npm run playwright:install      # one-time: install Chromium
 
-## Run The Demo
-
-```bash
 npm run testpilot -- demo --mode mock
 ```
 
-The demo starts the local app, generates a login test, runs it against the normal app, verifies a safe button-copy repair for the copy-change variant, and refuses to repair the regression variant.
+The demo spins up a bundled login app and runs three scenarios end-to-end:
 
-Focused commands are also available:
+| Scenario | What happens |
+|---|---|
+| **Normal** | Generated test passes against the unchanged app. |
+| **Copy change** ("Sign in" → "Log in") | Diagnosed `UI_COPY_CHANGE`; a safe repair is applied and the test passes again. |
+| **Regression** (login no longer reaches `/dashboard`) | Diagnosed `PRODUCT_REGRESSION`; the repair is **refused** and a human is asked to review. |
+
+Each run writes a markdown report and artifacts under `runs/<run>/`.
+
+### Focused commands
 
 ```bash
 npm run testpilot -- generate examples/login-spec.md --base-url http://127.0.0.1:3000
 npm run testpilot -- run tests/generated/login.spec.ts --base-url http://127.0.0.1:3000
-npm run testpilot -- diagnose runs/<run>/run-result.json examples/login-spec.md
+npm run testpilot -- diagnose runs/<run>/run-result.json examples/login-spec.md --vision
 npm run testpilot -- repair tests/generated/login.spec.ts runs/<run>/run-result.json examples/login-spec.md
 ```
 
-## OpenAI Mode
+---
 
-Set `OPENAI_API_KEY` (the same key powers `--vision`). Per session in PowerShell, or
-persist it with `setx OPENAI_API_KEY "..."` and restart the shell:
+## The live dashboard
 
-```bash
-$env:OPENAI_API_KEY = "..."
-npm run testpilot -- demo --mode openai --model gpt-5.5
-```
-
-Mock mode remains the deterministic default; OpenAI mode is verified end-to-end
-(generation, repair, and vision diagnosis) and degrades gracefully back to mock
-behavior when a call fails.
-
-## Vision-Assisted Diagnosis
-
-Pass `--vision` to `diagnose` or `repair` to refine the failure classification with
-a model's read of the failure screenshot:
-
-```bash
-npm run testpilot -- diagnose runs/<run>/run-result.json examples/login-spec.md --vision --mode openai
-```
-
-The deterministic heuristic classifier remains the floor. Vision is merged under a
-strict safety invariant: **it can veto a repair but never authorize one the
-heuristics did not already allow** — a result is repairable only when both the
-heuristic and the vision category agree it is safe drift. In mock mode the vision
-step concurs deterministically, so demos and CI stay reproducible.
-
-## Repair Pull Requests
-
-When a safe repair is applied, testpilot assembles a reviewable PR bundle under the
-run directory (`runs/<run>/pr/`) containing:
-
-- `pr-body.md` — summary, diagnosis, the unified diff, before/after screenshots, and a human-approval checklist.
-- `pr-meta.json` — proposed branch name, title, and base branch.
-- `repaired-test.ts` — the full repaired test.
-- `before.png` / `after.png` — failing vs. repaired state.
-
-By default nothing is pushed. To open a real GitHub PR (requires `gh` and an `origin` remote):
-
-```bash
-npm run testpilot -- repair tests/generated/login.spec.ts runs/<run>/run-result.json examples/login-spec.md --open-pr
-```
-
-If `gh` or a remote is missing, testpilot falls back to writing the local bundle and reports why.
-
-## Validation
-
-```bash
-npm run validate       # typecheck + unit tests
-npm run validate:demo  # validate, then run the full mock demo end-to-end
-```
-
-CI runs the same checks plus the demo on every push/PR (`.github/workflows/ci.yml`).
-
-## Live View
-
-A Grand Canyon pixel-art dashboard streams a run stage-by-stage — each pipeline
-stage forms a "canyon stratum" that reveals its evidence (screenshot, diagnosis +
-reasoning, diff, verdict) as events arrive over Server-Sent Events.
+A Grand Canyon themed dashboard streams a run stage-by-stage: each pipeline stage
+forms a "canyon stratum" that you can expand to its evidence (screenshot, diagnosis
+and reasoning, diff, verdict) as events arrive over Server-Sent Events.
 
 ```bash
 npm run ui:build      # build the dashboard (ui/ -> ui/dist)
-npm run serve         # then open http://127.0.0.1:4000 and press "Run demo"
+npm run serve         # open http://127.0.0.1:4000, then press "Run demo" or upload a story
 ```
 
 The server (`src/server`) exposes `GET /events` (SSE), `GET /api/runs`,
-`GET /artifacts/*` (sandboxed to `runs/`), and `POST /api/run`. The pipeline emits
-stage events through a process-local bus (`src/events`) that is a no-op for the
-plain CLI and gains the SSE sink only under `serve`. The dashboard is a standalone
-Vite/React app in `ui/`; `npm run ui:dev` runs it with a dev proxy to the server.
+`GET /artifacts/*`, `GET /api/projects`, `GET /api/stories`, and `POST` endpoints to
+trigger runs and stories. For UI development, `npm run ui:dev` runs the Vite app with
+a dev proxy to the server.
 
-## Graded UI Workflow
+---
 
-The dashboard was built and held to a bar by a two-agent loop: a **coder** agent
-implements the UI, and a **grader** agent scores it against a fixed rubric using a
-real **MCP server** (`tools/grader-mcp/`) for objective evidence.
+## Connecting real projects
 
-- `capture_ui` — multi-viewport screenshots (returned inline so the grader's vision sees them)
-- `run_ui_checks` — axe-core accessibility violations, console errors, metrics
-- `record_grade` — appends per-criterion scores to `grading/grades.jsonl`
-- `rubric://testpilot-ui` — the 7-criterion rubric (design-system rigor, evidence
-  altitude, real-data fidelity, live-ness, accessibility, theme craft, engineering)
-
-The server is registered in `.mcp.json`; `tools/grader-mcp/harness.mjs` is the MCP
-client that drives a grading round. The rubric explicitly penalizes the "vibe-coded"
-look (generic gradients, emoji-as-UI, component-kit defaults, fake data) and a repair
-only counts as passing when every criterion scores ≥ 3.
-
-## Platform: connected projects, story ingestion & living docs
-
-Beyond the bundled demo, testpilot can drive **connected projects** and ingest
-plain-English testing stories from multiple sources, then generate tests (and docs)
-for them.
+Beyond the bundled demo, register your own projects and feed them stories from several
+sources. Generated tests and docs are written **into the connected repo**.
 
 ```bash
-# Register a connected project (generated tests/docs land in its repo)
+# Register a project (its base URL, where tests/docs go in its repo)
 npm run testpilot -- project add acme --name "Acme web" --repo /path/to/acme \
   --base-url http://127.0.0.1:5173 --tests-dir tests/e2e
 
-# Upload a story and run it (CLI or the dashboard's Stories panel)
+# Upload a story (or use the dashboard's Stories panel)
 npm run testpilot -- spec add acme ./story.md
 
-# Pull stories from GitHub via the GitHub MCP server (token from GITHUB_TOKEN or gh)
+# Pull stories from GitHub issues (testpilot acts as an MCP client to the GitHub MCP server)
 npm run testpilot -- spec pull acme --owner acme --repo web --label needs-test --generate
 
-# Pull from Jira via a configured Jira MCP server (sources[].config.mcp + jql)
+# Pull from Jira via a configured Jira MCP server
 npm run testpilot -- spec pull-jira acme --jql "labels = needs-test"
 
-# Generate living documentation (per-flow markdown backed by tests) into the repo
+# Generate living documentation backed by the tests
 npm run testpilot -- docs acme
 ```
 
-Connectors run testpilot as an **MCP client** (`src/mcp/client.ts`) to the official
-GitHub / Atlassian MCP servers; the server launch is configurable per source. Living
-docs tie each flow to its test, so a failing status flags documentation that no longer
-matches the product. Arbitrary-app test generation is best-effort and keeps the
-human-approval gate; the project registry lives in a gitignored `.testpilot/`.
+**Story ingestion** uses real MCP connectors — testpilot is the MCP *client*
+(`src/mcp/client.ts`) and the GitHub/Jira MCP server launch is configurable per
+project. GitHub auth comes from `GITHUB_TOKEN` or `gh auth token`.
 
-## Roadmap
+**Living documentation** writes one markdown page per flow — the plain-English
+instructions, the derived steps, and a status backed by the flow's test. Because each
+doc is tied to a test, a failing status flags documentation that no longer matches the
+product. The project registry lives in a gitignored `.testpilot/`.
 
-The MVP uses direct Playwright APIs for browser control. Future extension points include:
+---
 
-- Playwright MCP as an optional browser-control backend for agent-tool demos.
-- Pushing repair PRs automatically from CI with uploaded before/after artifacts (local bundle + `--open-pr` exist today).
-- Richer vision diagnosis: side-by-side expected-vs-actual screenshot comparison (single-screenshot classification exists today via `--vision`).
+## Modes
+
+| Mode | Use | Notes |
+|---|---|---|
+| `--mode mock` (default) | Local dev, CI, demos | Deterministic; no API key; reproducible. |
+| `--mode openai` | Real generation/repair/vision | Set `OPENAI_API_KEY`; falls back to mock behavior if a call fails. |
+
+```bash
+export OPENAI_API_KEY="sk-..."        # or: setx OPENAI_API_KEY "..." on Windows
+npm run testpilot -- demo --mode openai
+```
+
+`--vision` (on `diagnose`/`repair`) adds a screenshot read to the diagnosis under the
+veto-only safety invariant above. In mock mode the vision step is deterministic so CI
+stays reproducible.
+
+---
+
+## CLI reference
+
+| Command | Description |
+|---|---|
+| `demo` | Run the bundled three-scenario demo end-to-end. |
+| `generate <spec> --base-url <url>` | Generate a test from a story. |
+| `run <test> --base-url <url> [--variant v]` | Run a test and collect artifacts. |
+| `diagnose <run-result> <spec> [--vision]` | Classify a failure. |
+| `repair <test> <run-result> <spec> [--open-pr] [--vision]` | Propose & apply a safe repair; bundle or open a PR. |
+| `serve [--port 4000]` | Start the live dashboard server. |
+| `project add\|list` | Register / list connected projects. |
+| `spec add <project> <file>` | Upload a story and run it. |
+| `spec pull <project> --owner --repo [--label] [--generate]` | Pull GitHub issues as stories. |
+| `spec pull-jira <project> [--jql]` | Pull Jira issues as stories. |
+| `docs <project>` | Generate living documentation. |
+
+---
+
+## Project structure
+
+```
+src/
+  spec/         parse a story into a structured intent
+  browser/      observe the page + collect failure artifacts (Playwright)
+  generator/    model clients (mock / openai) + test generation + guardrail
+  runner/       run a Playwright test
+  diagnosis/    heuristic classifier + vision merge
+  repair/       propose / validate / apply safe repairs
+  reporting/    markdown + JSON reports
+  pr/           reviewable PR bundle + optional GitHub PR
+  pipeline/     demo + story pipelines, demo-app lifecycle
+  events/       process-local event bus (powers the live view)
+  server/       SSE + REST server for the dashboard
+  projects/     connected-project registry
+  stories/      story store
+  connectors/   GitHub / Jira MCP connectors
+  mcp/          reusable MCP client
+  docs/         living-documentation generator
+ui/             the live dashboard (Vite + React)
+tools/grader-mcp/  grader MCP server used to hold the dashboard to a rubric
+demo/           the bundled demo app under test
+```
+
+---
+
+## Development
+
+```bash
+npm run validate       # typecheck + unit tests
+npm run validate:demo  # the above, then the full mock demo
+npm run build          # typecheck only
+npm run test           # unit tests
+```
+
+CI (`.github/workflows/ci.yml`) runs typecheck, unit tests, the dashboard build, and
+the end-to-end mock demo on every push and PR.
+
+### How the dashboard was built
+
+The dashboard was developed with a two-agent loop kept honest by an MCP grader: a
+**coder** agent implements the UI; a **grader** agent scores it against a fixed
+7-criterion rubric using a real MCP server (`tools/grader-mcp/`) that captures
+multi-viewport screenshots, runs axe-core accessibility checks, and records grades.
+The rubric explicitly penalizes the generic "AI-generated dashboard" look, and a
+revision only passes when every criterion clears the bar.
+
+---
+
+## Status & limitations
+
+- **Arbitrary-app test generation is best-effort.** The login demo is curated; real
+  apps are harder. Generation is a starting point, always behind the human-approval gate.
+- **Repairs auto-apply only within the generated-test directory** (a deliberate safety
+  boundary). Writing repairs into arbitrary external repos is intentionally gated.
+- **Jira ingestion is code-complete but requires your Jira + Atlassian MCP server** to
+  run live; the GitHub connector is verified end-to-end.
+
+---
+
+## License
+
+MIT — see [LICENSE](./LICENSE).
