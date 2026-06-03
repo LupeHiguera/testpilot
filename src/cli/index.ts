@@ -5,6 +5,7 @@ import path from 'node:path';
 import { Command } from 'commander';
 import { observePage } from '../browser/observePage.js';
 import { fetchGithubStories } from '../connectors/github.js';
+import { fetchJiraStories, JiraSourceConfig } from '../connectors/jira.js';
 import { createRunDir, defaultBaseUrl, generatedTestsDir } from '../core/config.js';
 import { generateDocs } from '../docs/generateDocs.js';
 import { ModelMode } from '../core/types.js';
@@ -257,6 +258,35 @@ specCmd
           }
         }
       }
+    }
+  });
+
+specCmd
+  .command('pull-jira')
+  .description('Pull Jira issues as stories via a configured Jira MCP server')
+  .argument('<project-id>')
+  .option('--jql <jql>', 'Override the JQL from the project source config')
+  .action(async (projectId, options) => {
+    const project = await getProject(projectId);
+    if (!project) {
+      console.error(`Unknown project: ${projectId}`);
+      process.exitCode = 1;
+      return;
+    }
+    const source = project.sources.find((entry) => entry.type === 'jira');
+    const config = source?.config as unknown as JiraSourceConfig | undefined;
+    if (!config?.mcp) {
+      console.error(
+        'No Jira source configured. Add a sources[] entry of type "jira" with config.mcp (server launch) and config.jql to the project file.'
+      );
+      process.exitCode = 1;
+      return;
+    }
+    const mapped = await fetchJiraStories({ ...config, jql: options.jql ?? config.jql });
+    console.log(`Pulled ${mapped.length} Jira issue(s)`);
+    for (const item of mapped) {
+      const story = await addStory({ projectId: project.id, source: 'jira', externalId: item.externalId, title: item.title, body: item.body });
+      console.log(`  ${story.externalId}  ${story.title}`);
     }
   });
 

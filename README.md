@@ -128,6 +128,36 @@ client that drives a grading round. The rubric explicitly penalizes the "vibe-co
 look (generic gradients, emoji-as-UI, component-kit defaults, fake data) and a repair
 only counts as passing when every criterion scores ≥ 3.
 
+## Platform: connected projects, story ingestion & living docs
+
+Beyond the bundled demo, testpilot can drive **connected projects** and ingest
+plain-English testing stories from multiple sources, then generate tests (and docs)
+for them.
+
+```bash
+# Register a connected project (generated tests/docs land in its repo)
+npm run testpilot -- project add acme --name "Acme web" --repo /path/to/acme \
+  --base-url http://127.0.0.1:5173 --tests-dir tests/e2e
+
+# Upload a story and run it (CLI or the dashboard's Stories panel)
+npm run testpilot -- spec add acme ./story.md
+
+# Pull stories from GitHub via the GitHub MCP server (token from GITHUB_TOKEN or gh)
+npm run testpilot -- spec pull acme --owner acme --repo web --label needs-test --generate
+
+# Pull from Jira via a configured Jira MCP server (sources[].config.mcp + jql)
+npm run testpilot -- spec pull-jira acme --jql "labels = needs-test"
+
+# Generate living documentation (per-flow markdown backed by tests) into the repo
+npm run testpilot -- docs acme
+```
+
+Connectors run testpilot as an **MCP client** (`src/mcp/client.ts`) to the official
+GitHub / Atlassian MCP servers; the server launch is configurable per source. Living
+docs tie each flow to its test, so a failing status flags documentation that no longer
+matches the product. Arbitrary-app test generation is best-effort and keeps the
+human-approval gate; the project registry lives in a gitignored `.testpilot/`.
+
 ## Roadmap
 
 The MVP uses direct Playwright APIs for browser control. Future extension points include:
