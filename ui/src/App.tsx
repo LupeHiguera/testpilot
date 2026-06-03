@@ -319,6 +319,7 @@ function LiveCanyon({ events, connection }: { events: PipelineEvent[]; connectio
             ))}
           </div>
           <VerdictBanner view={verdictFromLive(events)} />
+          <div className="river-floor" aria-hidden />
         </div>
         <aside className="depth-gauge" aria-label="Run depth and elapsed time">
           <div className="gauge-block">
@@ -339,10 +340,52 @@ function LiveCanyon({ events, connection }: { events: PipelineEvent[]; connectio
   );
 }
 
+/**
+ * One concrete datum to surface on a non-start row FACE, pulled straight from
+ * the event payload so each layer carries real evidence (evidence_altitude):
+ *  - diagnose rows -> confidence % + repairable verdict
+ *  - run rows      -> scenario + pass/fail
+ *  - repair rows   -> applied / refused
+ * spec/observe/generate/pr rows already carry their datum in the label (route,
+ * captured counts, bundle path), so they don't get a second chip. Start rows and
+ * anything without a meaningful datum return null.
+ */
+function rowDatum(event: PipelineEvent): { text: string; kind: 'ok' | 'no' | 'neutral' } | null {
+  if (event.status === 'start') return null;
+  const data = event.data ?? {};
+  const scenario = typeof data.scenario === 'string' ? data.scenario : undefined;
+  const diagnosis = data.diagnosis as Diagnosis | undefined;
+
+  if (event.stage === 'diagnose' && diagnosis) {
+    const conf =
+      typeof diagnosis.confidence === 'number'
+        ? `${Math.round(diagnosis.confidence <= 1 ? diagnosis.confidence * 100 : diagnosis.confidence)}% conf`
+        : undefined;
+    const repair = diagnosis.repairable ? 'repairable' : 'repair refused';
+    return {
+      text: [conf, repair].filter(Boolean).join(' · '),
+      kind: diagnosis.repairable ? 'ok' : 'no'
+    };
+  }
+  if (event.stage === 'run') {
+    const verdict = event.status === 'pass' ? 'pass' : event.status === 'fail' ? 'fail' : event.status;
+    return {
+      text: [scenario, verdict].filter(Boolean).join(' · '),
+      kind: event.status === 'pass' ? 'ok' : event.status === 'fail' ? 'no' : 'neutral'
+    };
+  }
+  if (event.stage === 'repair') {
+    const applied = event.status === 'pass';
+    return { text: applied ? 'applied' : 'refused', kind: applied ? 'ok' : 'no' };
+  }
+  return null;
+}
+
 function Strata({ event, active }: { event: PipelineEvent; active: boolean }) {
   const [open, setOpen] = useState(false);
   const evidence = collectEvidence(event);
   const hasEvidence = Boolean(evidence);
+  const datum = rowDatum(event);
   // Surface the failure category on the row FACE (not just when expanded), and
   // flag a regression so the row gets a stronger geological "fault line" break.
   const category = evidence?.diagnosis?.category;
@@ -369,6 +412,7 @@ function Strata({ event, active }: { event: PipelineEvent; active: boolean }) {
       <span className="strata-text">
         <span className="stage">{STAGE_NAME[event.stage]}</span>
         <span className="label">{event.label}</span>
+        {datum && <span className={`row-datum datum-${datum.kind}`}>{datum.text}</span>}
       </span>
       {category && (
         <span className={`tag tag-${isRegression ? 'regression' : 'copy'} strata-tag`}>
@@ -607,6 +651,7 @@ function PastRun({ runId }: { runId: string }) {
               <DiagnosisCard diagnosis={report.diagnosis} />
             </div>
           )}
+          <div className="river-floor" aria-hidden />
         </div>
         <aside className="depth-gauge" aria-label="Run depth">
           <div className="gauge-block">

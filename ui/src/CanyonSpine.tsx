@@ -14,15 +14,21 @@ import type { ReactElement } from 'react';
  * marker lines up with real rows.
  */
 
-const COLS = 16; // pixel columns across the narrow cliff
+const COLS = 28; // pixel columns across the WIDE cliff (~92px on screen)
 const U = 4; // user units per pixel block
 
-// Warm sandstone -> deep shadow, matching the --strata-* tokens (kept in sync
-// with theme.css; values duplicated here because SVG fills can't read CSS vars
-// per-rect cheaply at this grid size).
-const BAND = ['#f0bf6b', '#e0a05a', '#c8703f', '#b85a34', '#a8512f', '#7d3b29', '#5a2c22'];
-const RIM_LIGHT = '#ffdf9a';
-const GROOVE = '#3a1c14';
+// POLYCHROME canyon: a blue sky strip at the rim, varied limestone/ochre/red
+// walls, then a teal river at the floor — matching the --sky-*, --strata-*, and
+// --river* tokens (duplicated here because SVG fills can't read CSS vars cheaply
+// per-rect at this grid size; kept in sync with theme.css).
+const SKY = ['#bcd9e6', '#6ea3c0', '#3d6e8c']; // rim sky: pale -> deep blue
+const BAND = ['#e9d8b4', '#e6c281', '#e0a96d', '#cf6b3f', '#b9502f', '#a8432c', '#7c3a2e', '#5e3330'];
+const RIM_LIGHT = '#f3e8c8'; // sunlit limestone edge
+const GROOVE = '#3a221f'; // dark fracture line
+const RIVER = '#2fa89a';
+const RIVER_BRIGHT = '#49c5b4';
+const RIVER_DEEP = '#1f7d72';
+const GREEN = '#7e9b5e'; // sparse juniper clinging to the wall
 const SUN = '#ffd873';
 const SUN_CORE = '#fff0c2';
 
@@ -38,28 +44,48 @@ export function CanyonSpine({
   const ROWS = Math.max(rows, total * 3);
   const rects: ReactElement[] = [];
 
-  // Map a pixel row to a strata band so the wall darkens with depth, matching
-  // the stacked rows beside it.
+  // Vertical bands of the scene, top -> bottom: a thin sky strip at the rim, the
+  // polychrome rock wall, then a teal river at the floor. Fractions of height.
+  const SKY_END = Math.max(2, Math.round(ROWS * 0.07)); // sky strip rows
+  const RIVER_START = ROWS - Math.max(2, Math.round(ROWS * 0.06)); // river rows
+  const wallSpan = Math.max(1, RIVER_START - SKY_END);
+
   for (let y = 0; y < ROWS; y++) {
-    const t = ROWS <= 1 ? 0 : y / (ROWS - 1);
-    let band = Math.min(BAND.length - 1, Math.floor(t * BAND.length));
     for (let x = 0; x < COLS; x++) {
-      let fill = BAND[band];
-      // Sunlit rim down the right edge of the cliff (faces the strata rows).
-      if (x >= COLS - 2 && (x + y) % 7 !== 0) fill = RIM_LIGHT;
-      // Eroded vertical grooves so it doesn't read as a flat ruled bar.
-      const groove = (x * 3 + Math.round(Math.sin(y * 0.4) * 2) + 16) % 5 === 0;
-      if (groove && x < COLS - 2) fill = BAND[Math.min(BAND.length - 1, band + 1)];
-      // Occasional darker fracture lines between bands.
-      if (y % Math.max(2, Math.floor(ROWS / BAND.length)) === 0 && x < COLS - 2) fill = GROOVE;
+      let fill: string;
+      if (y < SKY_END) {
+        // Blue sky at the rim, paling upward.
+        const s = Math.min(SKY.length - 1, Math.floor((y / Math.max(1, SKY_END)) * SKY.length));
+        fill = SKY[s];
+      } else if (y >= RIVER_START) {
+        // Teal river at the floor with a lit ripple line.
+        const r = y - RIVER_START;
+        fill = r === 0 ? RIVER_BRIGHT : (x + y) % 4 === 0 ? RIVER : RIVER_DEEP;
+      } else {
+        // Polychrome rock wall: band darkens/reddens with depth.
+        const t = (y - SKY_END) / wallSpan;
+        let band = Math.min(BAND.length - 1, Math.floor(t * BAND.length));
+        fill = BAND[band];
+        // Sunlit rim down the right edge of the cliff (faces the strata rows).
+        if (x >= COLS - 2 && (x + y) % 7 !== 0) fill = RIM_LIGHT;
+        // Eroded vertical grooves so it doesn't read as a flat ruled bar.
+        const groove = (x * 3 + Math.round(Math.sin(y * 0.4) * 2) + 16) % 5 === 0;
+        if (groove && x < COLS - 2) fill = BAND[Math.min(BAND.length - 1, band + 1)];
+        // Occasional darker fracture lines between bands.
+        if ((y - SKY_END) % Math.max(2, Math.floor(wallSpan / BAND.length)) === 0 && x < COLS - 2) fill = GROOVE;
+        // Sparse juniper greenery clinging to ledges in the upper-mid wall.
+        if (band <= 3 && x > 1 && x < 6 && (x * 5 + y * 3) % 23 === 0) fill = GREEN;
+      }
       rects.push(<rect key={`w-${x}-${y}`} x={x * U} y={y * U} width={U} height={U} fill={fill} />);
     }
   }
 
   // --- Descending sun marker: sits at the depth of the deepest reached layer.
+  //     frac = reached/total so a COMPLETE run (reached === total) lands the
+  //     marker at the floor, and an empty run sits at the rim.
   if (total > 0) {
-    const frac = total <= 1 ? 0 : (reached - 1) / total;
-    const markY = Math.min(ROWS - 4, Math.round(frac * ROWS) + 1);
+    const frac = Math.min(1, reached / total);
+    const markY = Math.min(ROWS - 4, Math.max(1, Math.round(frac * (ROWS - 1))));
     const markX = 3;
     // a small sun disc embedded in the cliff, tracking the run's descent
     const disc: Array<[number, number]> = [

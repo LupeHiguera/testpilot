@@ -1,35 +1,39 @@
 import type { ReactElement } from 'react';
 
 /**
- * Pixel-art Sonoran canyon at dusk for the hero empty state.
+ * Pixel-art Grand Canyon for the hero empty state.
  *
  * Built on a coarse integer grid with hard edges (shapeRendering: crispEdges)
- * so it reads as deliberate pixel-art. The scene has real depth: a dusk-gradient
- * sky with a sharp eight-ray sun, layered distant mesas, then a near canyon wall
- * with irregular eroded strata bands and a turquoise river threading the floor.
+ * so it reads as deliberate pixel-art. The scene has real depth and is
+ * POLYCHROME: a blue-gradient sky with a sharp eight-ray sun, layered distant
+ * mesas, a near canyon wall with varied limestone/ochre/red eroded strata bands
+ * dotted with sparse juniper greenery, and a teal river threading the floor.
  *
  * Wide + short on purpose: the banner is letterboxed, and preserveAspectRatio
  * "slice" scales to width — a tall scene would crop the sky away. Colors echo
- * the desert tokens; the .pixel-canyon CSS background uses the tokens directly.
+ * the canyon tokens; the .pixel-canyon CSS background uses the tokens directly.
  */
 
 const U = 6; // SVG user units per pixel block
 const COLS = 120;
 const ROWS = 30;
 
-// Desert-dusk palette (top sky -> deep canyon shadow), matching theme tokens.
-const SKY_TOP = '#caa7b8'; // dusty rose high sky
-const SKY_MID = '#e08e63'; // amber band near horizon
-const SKY_LOW = '#d27a48'; // terracotta haze
+// Grand Canyon polychrome palette (blue sky -> varied walls -> teal river),
+// matching the --sky-*, --strata-*, and --river* theme tokens.
+const SKY_TOP = '#bcd9e6'; // pale dusk blue high sky
+const SKY_MID = '#6ea3c0'; // mid blue
+const SKY_LOW = '#3d6e8c'; // deep blue near the rim
 const SUN = '#ffd873';
 const SUN_CORE = '#fff0c2';
-const MESA_FAR = '#9a6048'; // distant mesa silhouette
-const MESA_MID = '#7d4636';
-const STRATA = ['#f0bf6b', '#e0a05a', '#c8703f', '#a8512f', '#7d3b29', '#5a2c22']; // wall bands
-const RIM_LIGHT = '#ffdf9a';
-const RIVER = '#3fb8a6';
+const MESA_FAR = '#8a6f86'; // distant blue-mauve mesa (atmospheric haze)
+const MESA_MID = '#9a5a47'; // nearer red-brown mesa
+const STRATA = ['#e9d8b4', '#e0a96d', '#cf6b3f', '#b9502f', '#a8432c', '#7c3a2e', '#5e3330']; // wall bands
+const RIM_LIGHT = '#f3e8c8';
+const GREEN = '#7e9b5e'; // juniper / sage vegetation
+const GREEN_DEEP = '#4f6b3f';
+const RIVER = '#49c5b4';
 const RIVER_DEEP = '#1f7d72';
-const FLOOR = '#43271f';
+const FLOOR = '#3a2926';
 
 function px(rects: ReactElement[], x: number, y: number, fill: string, key: string) {
   if (x < 0 || x >= COLS || y < 0 || y >= ROWS) return;
@@ -123,6 +127,24 @@ export function PixelCanyon() {
     }
   }
 
+  // --- Sparse juniper / sage vegetation: a few small trees clinging to the rim
+  //     and ledges, so the scene reads with GREENERY (used sparingly). ---
+  const trees: Array<[number, number]> = [
+    [7, rim(7)],
+    [29, rim(29)],
+    [53, rim(53)],
+    [71, rim(71)],
+    [97, rim(97)]
+  ];
+  trees.forEach(([tx, ty], i) => {
+    // a 2-wide, 3-tall juniper tuft with a darker base
+    px(rects, tx, ty - 2, GREEN, `tree-${i}-a`);
+    px(rects, tx + 1, ty - 2, GREEN, `tree-${i}-b`);
+    px(rects, tx, ty - 1, GREEN_DEEP, `tree-${i}-c`);
+    px(rects, tx + 1, ty - 1, GREEN, `tree-${i}-d`);
+    px(rects, tx, ty - 3, GREEN, `tree-${i}-e`);
+  });
+
   // --- Canyon floor + meandering turquoise river seated on the floor. ---
   for (let x = 0; x < COLS; x++) {
     for (let y = FLOOR_Y; y < ROWS; y++) px(rects, x, y, FLOOR, `fl-${x}-${y}`);
@@ -138,7 +160,7 @@ export function PixelCanyon() {
       className="pixel-canyon"
       viewBox={`0 0 ${COLS * U} ${ROWS * U}`}
       role="img"
-      aria-label="Pixel-art Sonoran canyon at dusk: a sharp sun over layered mesas, an eroded strata wall, and a turquoise river on the canyon floor"
+      aria-label="Pixel-art Grand Canyon: a blue sky and sun over layered mesas, polychrome red-and-ochre strata walls dotted with juniper, and a teal river on the canyon floor"
       preserveAspectRatio="xMidYMax slice"
       shapeRendering="crispEdges"
     >

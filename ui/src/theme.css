@@ -1,49 +1,64 @@
 /* ============================================================================
-   testpilot live view — SONORAN DUSK design system
-   A deliberate, warm desert palette (NO indigo/purple). Constrained tokens,
-   pixel-art borders, eroded-strata rock wall, dither + scanline texture.
+   testpilot live view — GRAND CANYON POLYCHROME design system
+   A full canyon gradient: blue sky at the rim, varied red/ochre/limestone rock
+   walls in the middle, a teal river at the floor, with sparing juniper greenery.
+   Constrained, named tokens (no scattered magic values); pixel-art borders,
+   eroded-strata rock wall, dither + scanline texture.
    ========================================================================== */
 :root {
-  /* --- Canyon strata: one unbroken sunlit-rim -> bedrock depth sequence.
-     Eight layers, one per pipeline stage, so the geological depth metaphor is
-     continuous (no out-of-band repair color, no reused layer). */
-  --strata-1: #f0bf6b; /* sunlit sandstone — spec / rim */
-  --strata-2: #e0a05a; /* ochre — observe / caprock */
-  --strata-3: #d18a4a; /* amber sandstone — generate */
-  --strata-4: #c8703f; /* terracotta — run */
-  --strata-5: #a8512f; /* rust — diagnose */
-  --strata-6: #b85a34; /* burnt sienna — repair / schist */
-  --strata-7: #7d3b29; /* oxblood — pr / ledge */
-  --strata-8: #5a2c22; /* deep canyon shadow — decision / bedrock */
+  /* --- Sky: the canyon RIM reads as open sky. Pale dusk blue -> deep blue,
+     used at the top of the view, the page background, and calm surfaces. */
+  --sky-1: #bcd9e6; /* pale dusk blue (high sky) */
+  --sky-2: #6ea3c0; /* mid blue */
+  --sky-3: #3d6e8c; /* deep blue near the rim */
+  --sky-shadow: #274a61; /* deepest sky / shaded scarp */
 
-  /* --- Surfaces: warm desert-night, NOT indigo. Charred-clay browns. */
-  --night: #261712; /* canyon-floor night */
-  --night-2: #311e16; /* raised clay panel */
-  --night-3: #3d271c; /* hover / inset */
-  --rim: #5c3a28; /* hairline borders (warm) */
-  --rim-bright: #8a5436; /* lit pixel edge */
+  /* --- Canyon strata: a POLYCHROME rim -> bedrock sequence. Warm but VARIED —
+     limestone cream, pale ochre, vermilion, red rust, deep maroon — not brown
+     on brown. Eight layers, one per pipeline stage; the metaphor stays
+     continuous (no reused layer). */
+  --strata-1: #e9d8b4; /* limestone cream — spec / rim */
+  --strata-2: #e6c281; /* pale ochre-cream — observe / caprock */
+  --strata-3: #e0a96d; /* pale ochre — generate */
+  --strata-4: #cf6b3f; /* vermilion — run */
+  --strata-5: #b9502f; /* red-orange — diagnose */
+  --strata-6: #a8432c; /* red rust — repair / schist */
+  --strata-7: #7c3a2e; /* oxblood — pr / ledge */
+  --strata-8: #5e3330; /* deep maroon-shadow — decision / bedrock */
 
-  /* --- Dusk sky accents (hero + highlights) */
-  --dusk-rose: #caa7b8;
-  --dusk-amber: #e08e63;
+  /* --- Surfaces: shaded-canyon dusk. Deep blue-slate so the warm walls and
+     teal river pop against them (no longer brown-on-brown). */
+  --night: #1c2630; /* canyon-floor shade */
+  --night-2: #25333f; /* raised panel */
+  --night-3: #2f4150; /* hover / inset */
+  --rim: #46586a; /* hairline borders */
+  --rim-bright: #6f8aa0; /* lit pixel edge */
 
   /* --- Ink */
-  --sand: #f6e7cd; /* primary text on dark */
-  --sand-dim: #d3b896; /* secondary text */
-  --ink: #2a140e; /* text on light chips */
+  --sand: #f6ecd8; /* primary text on dark */
+  --sand-dim: #c2c9d2; /* secondary text (cool, reads on slate) */
+  --ink: #2a140e; /* text on light limestone/ochre chips */
 
-  /* --- Accents */
+  /* --- River / accents */
   --turquoise: #2fa89a; /* river / pass */
   --turquoise-deep: #1f7d72;
   --turquoise-bright: #6fe3d3; /* pass text on dark chip — meets 4.5:1 */
+  --river: #2fa89a; /* canyon-floor teal river */
+  --river-bright: #49c5b4; /* lit river ripple */
+  --river-deep: #1f7d72; /* river shadow */
+
+  /* --- Greenery: juniper / sage, used SPARINGLY for vegetation + pass accents. */
+  --green-sage: #7e9b5e;
+  --green-juniper: #4f6b3f;
+
   --sun: #ffcf5e;
   --sun-bright: #ffe199;
   --canyon-red: #d9492f; /* fail */
   --canyon-red-bright: #ff8f74; /* fail text on dark chip */
 
-  /* Neutral dark chip surface for badges so they don't sit on warm strata */
-  --chip: #1c0f0a;
-  --chip-2: #2a1810;
+  /* Neutral dark chip surface for badges so they don't sit on the warm strata */
+  --chip: #141d25;
+  --chip-2: #1f2c36;
 
   /* Spacing scale */
   --s1: 4px;
@@ -85,19 +100,32 @@ body {
   font-size: var(--t-base);
   line-height: 1.5;
   color: var(--sand);
-  /* Dither dot-grid + faint horizontal scanlines over a warm dusk gradient.
-     Texture reads as "old display" without competing with run data. */
+  /* A full canyon gradient FILLS the viewport so scrolled/empty areas read as
+     canyon depth, not void: blue sky at the rim -> ochre/red walls in the body
+     -> a teal river band anchoring the floor. Dither dot-grid + faint scanlines
+     add "old display" texture without competing with run data. */
   background:
     repeating-linear-gradient(
       0deg,
-      rgba(0, 0, 0, 0.06) 0,
-      rgba(0, 0, 0, 0.06) 1px,
+      rgba(0, 0, 0, 0.05) 0,
+      rgba(0, 0, 0, 0.05) 1px,
       transparent 1px,
       transparent 3px
     ),
-    radial-gradient(rgba(255, 224, 180, 0.05) 1px, transparent 1px) 0 0 / 6px 6px,
-    radial-gradient(rgba(255, 224, 180, 0.03) 1px, transparent 1px) 3px 3px / 6px 6px,
-    linear-gradient(180deg, #3a241b 0%, var(--night) 48%, #1c100b 100%);
+    radial-gradient(rgba(255, 240, 210, 0.05) 1px, transparent 1px) 0 0 / 6px 6px,
+    radial-gradient(rgba(255, 240, 210, 0.03) 1px, transparent 1px) 3px 3px / 6px 6px,
+    linear-gradient(
+      180deg,
+      var(--sky-1) 0%,
+      var(--sky-2) 9%,
+      var(--sky-3) 17%,
+      var(--strata-3) 27%,
+      var(--strata-5) 44%,
+      var(--strata-7) 64%,
+      var(--strata-8) 80%,
+      var(--river-deep) 93%,
+      var(--river) 100%
+    );
   background-attachment: fixed;
 }
 
@@ -307,6 +335,25 @@ button.secondary {
   display: flex;
   flex-direction: column;
   gap: var(--s2);
+  /* Cap the history so a long run list scrolls within its own pane rather than
+     dominating the page; a small inset gutter keeps focus rings from clipping. */
+  max-height: min(62vh, 520px);
+  overflow-y: auto;
+  padding-right: var(--s1);
+}
+/* Slim, themed scrollbar for the capped history list. */
+.runlist::-webkit-scrollbar {
+  width: 8px;
+}
+.runlist::-webkit-scrollbar-track {
+  background: var(--night);
+}
+.runlist::-webkit-scrollbar-thumb {
+  background: var(--rim);
+  border: var(--px) solid var(--night);
+}
+.runlist::-webkit-scrollbar-thumb:hover {
+  background: var(--rim-bright);
 }
 .runlist li button {
   width: 100%;
@@ -351,24 +398,46 @@ button.secondary {
 }
 
 /* ---- Populated run layout: the canyon STRUCTURES the view ----------------
-   Three columns: a vertical pixel cliff-face spine the run descends, the wide
-   strata column (rows seated into the wall), and a right-side depth/elapsed
-   gauge. This uses the full width so there is no dead brown void at 1440px. */
+   Three columns: a wide vertical pixel cliff-face spine the run descends, the
+   strata column (rows seated INTO the wall — content over the rock face), and a
+   right-side depth/elapsed gauge. Full width so there is no dead void at 1440px;
+   a teal river floor anchors the bottom so the column never trails into a void. */
 .canyon-grid {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) 150px;
+  grid-template-columns: 92px minmax(0, 1fr) 150px;
   gap: 0;
   align-items: stretch;
   border: var(--px) solid var(--chip);
   background: var(--chip);
+  position: relative;
 }
-/* The cliff-face spine: a tall pixel wall the descending sun marker runs down. */
+/* The cliff-face spine: a tall, wide pixel wall the descending sun marker runs
+   down. At 92px it reads as a real canyon wall the layout is carved into, not a
+   decorative border. */
 .canyon-spine-col {
   position: relative;
   background: var(--strata-8);
   border-right: var(--px) solid #00000066;
   box-shadow: inset calc(-1 * var(--px)) 0 0 rgba(255, 240, 210, 0.18);
   min-height: 100%;
+  z-index: 0;
+}
+/* A carved depth-axis label running up the cliff so the wide wall reads as the
+   geological backbone of the layout, not empty rock. */
+.canyon-spine-col::after {
+  content: 'CANYON DEPTH';
+  position: absolute;
+  left: 6px;
+  bottom: var(--s4);
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgba(246, 236, 216, 0.55);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+  pointer-events: none;
 }
 .canyon-spine {
   display: block;
@@ -382,6 +451,13 @@ button.secondary {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  position: relative;
+  z-index: 1;
+  /* Seat the strata rows visually INSIDE the cliff: the wall edge overlaps the
+     left of the content so rows read as carved into the rock face. */
+  margin-left: -10px;
+  border-left: var(--px) solid rgba(0, 0, 0, 0.45);
+  box-shadow: inset 6px 0 10px -6px rgba(0, 0, 0, 0.55);
 }
 /* Right rail: a stacked depth + elapsed gauge carved into the canyon edge. */
 .depth-gauge {
@@ -389,7 +465,8 @@ button.secondary {
   flex-direction: column;
   gap: var(--s4);
   padding: var(--s4) var(--s3);
-  background: linear-gradient(180deg, var(--night-2), var(--night));
+  /* The gauge sits at the shaded canyon edge: deep sky-shadow fading to floor. */
+  background: linear-gradient(180deg, var(--sky-shadow), var(--night));
   border-left: var(--px) solid #00000066;
   box-shadow: inset var(--px) 0 0 rgba(255, 240, 210, 0.12);
 }
@@ -429,9 +506,75 @@ button.secondary {
 .gauge-status.is-live {
   color: var(--turquoise-bright);
 }
+/* The river floor: a teal water band carved at the very bottom of the run
+   column so the main scene always ends on water, never a flat empty expanse. */
+.river-floor {
+  height: 26px;
+  flex: none;
+  margin-top: auto;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      var(--river) 0 7px,
+      var(--river-bright) 7px 11px,
+      var(--river) 11px 18px,
+      var(--river-deep) 18px 22px
+    );
+  border-top: var(--px) solid rgba(0, 0, 0, 0.5);
+  box-shadow: inset 0 var(--px) 0 rgba(255, 255, 255, 0.18),
+    inset 0 calc(-2 * var(--px)) 0 var(--river-deep);
+  position: relative;
+}
+/* Sparse sage reeds clinging to the left bank at the waterline — a small spot of
+   greenery (used sparingly) where the wall meets the river. */
+.river-floor::before {
+  content: '';
+  position: absolute;
+  left: var(--s3);
+  top: -4px;
+  width: 26px;
+  height: 8px;
+  background:
+    linear-gradient(90deg, transparent 0 2px, var(--green-juniper) 2px 4px, transparent 4px 7px,
+      var(--green-sage) 7px 9px, transparent 9px 13px, var(--green-juniper) 13px 15px,
+      transparent 15px 19px, var(--green-sage) 19px 21px, transparent 21px);
+  pointer-events: none;
+}
+.river-floor::after {
+  content: 'CANYON FLOOR · RIVER';
+  position: absolute;
+  right: var(--s3);
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(13, 40, 36, 0.85);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
 @media (max-width: 720px) {
+  /* Structural fallback: the vertical spine folds into a horizontal strata band
+     across the top so the geological read survives on mobile. The spine SVG is
+     repurposed as a wide rock band; the depth axis label is hidden. */
   .canyon-grid {
-    grid-template-columns: 28px minmax(0, 1fr);
+    grid-template-columns: 1fr;
+  }
+  .canyon-spine-col {
+    min-height: 0;
+    height: 18px;
+    border-right: none;
+    border-bottom: var(--px) solid #00000066;
+    box-shadow: inset 0 calc(-1 * var(--px)) 0 rgba(255, 240, 210, 0.18);
+  }
+  .canyon-spine-col::after {
+    display: none; /* depth axis label doesn't fit the slim horizontal band */
+  }
+  .canyon-main {
+    margin-left: 0;
+    border-left: none;
+    box-shadow: none;
   }
   .depth-gauge {
     display: none; /* gauge folds away on narrow screens; strata stay legible */
@@ -516,36 +659,37 @@ button.secondary {
   min-width: 0;
 }
 
-/* Strata colors — one continuous depth sequence, sunlit rim (top of pipeline)
-   down to bedrock (decision). Each stage owns its own layer; none are reused. */
+/* Strata colors — one continuous POLYCHROME depth sequence, limestone rim (top
+   of pipeline) down to deep-maroon bedrock (decision). The light cream/ochre
+   bands keep dark --ink for AA contrast; the vermilion/red/maroon bands switch
+   to light --sand. Each stage owns its own layer; none are reused. */
 .strata.s-spec {
-  background: var(--strata-1);
+  background: var(--strata-1); /* limestone cream — dark ink */
 }
 .strata.s-observe {
-  background: var(--strata-2);
+  background: var(--strata-2); /* pale ochre-cream — dark ink */
 }
 .strata.s-generate {
-  background: var(--strata-3);
-  color: var(--sand);
+  background: var(--strata-3); /* pale ochre — dark ink */
 }
 .strata.s-run {
-  background: var(--strata-4);
+  background: var(--strata-4); /* vermilion — light text */
   color: var(--sand);
 }
 .strata.s-diagnose {
-  background: var(--strata-5);
+  background: var(--strata-5); /* red-orange — light text */
   color: var(--sand);
 }
 .strata.s-repair {
-  background: var(--strata-6);
+  background: var(--strata-6); /* red rust — light text */
   color: var(--sand);
 }
 .strata.s-pr {
-  background: var(--strata-7);
+  background: var(--strata-7); /* oxblood — light text */
   color: var(--sand);
 }
 .strata.s-decision {
-  background: var(--strata-8);
+  background: var(--strata-8); /* deep maroon — light text */
   color: var(--sand);
 }
 .strata.clickable {
@@ -576,6 +720,36 @@ button.secondary {
 .scenario-note {
   font-size: var(--t-sm);
   opacity: 0.8;
+}
+/* A concrete per-row datum chip surfaced on the strata FACE (confidence %,
+   scenario + verdict, applied/refused) so every non-start layer carries
+   evidence at a glance. Sits on a dark chip so it clears AA on any wall color. */
+.row-datum {
+  align-self: start;
+  margin-top: 2px;
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  padding: 2px var(--s2);
+  background: var(--chip);
+  border: var(--px) solid var(--rim);
+  color: var(--sand);
+}
+.row-datum.datum-ok {
+  color: var(--turquoise-bright);
+  border-color: var(--turquoise-deep);
+}
+.row-datum.datum-no {
+  color: var(--canyon-red-bright);
+  border-color: #7a2a1f;
+}
+.row-datum.datum-neutral {
+  color: var(--sand-dim);
 }
 /* Failure-category tag shown on the strata FACE (regression vs copy-change). */
 .strata-tag {
@@ -858,8 +1032,8 @@ button.secondary {
   height: 220px;
   image-rendering: pixelated;
   border-bottom: var(--px) solid var(--rim);
-  /* dusk sky behind the scene, expressed via tokens (no duplicated hex). */
-  background: linear-gradient(180deg, var(--dusk-rose) 0%, var(--dusk-amber) 55%, var(--strata-3) 100%);
+  /* blue sky behind the scene, expressed via tokens (no duplicated hex). */
+  background: linear-gradient(180deg, var(--sky-1) 0%, var(--sky-2) 40%, var(--sky-3) 70%, var(--strata-3) 100%);
 }
 @media (max-width: 880px) {
   .pixel-canyon {
@@ -939,7 +1113,7 @@ button.secondary {
   align-items: center;
   gap: var(--s4);
   padding: var(--s4) var(--s4) var(--s4) var(--s5);
-  background: linear-gradient(180deg, #2e1b13 0%, var(--strata-8) 100%);
+  background: linear-gradient(180deg, var(--strata-7) 0%, var(--strata-8) 100%);
   border-top: var(--px) solid #00000080;
   box-shadow: inset 0 var(--px) 0 rgba(255, 240, 210, 0.18);
   overflow: hidden;
@@ -1049,7 +1223,7 @@ button.secondary {
 .skeleton {
   display: block;
   border-radius: 0;
-  background: linear-gradient(90deg, var(--rim) 0%, #7a4a30 50%, var(--rim) 100%);
+  background: linear-gradient(90deg, var(--rim) 0%, var(--rim-bright) 50%, var(--rim) 100%);
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.3s ease-in-out infinite;
 }
