@@ -13,6 +13,8 @@ broke (login no longer reaches the dashboard), it **refuses to touch the test** 
 flags it for a human. A passing test suite stays meaningful instead of being quietly
 rubber-stamped green.
 
+![The testpilot live dashboard streaming a run as Grand Canyon strata](docs/dashboard.png)
+
 ---
 
 ## What it does
