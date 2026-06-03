@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { getRun, listRuns, triggerRun } from './api';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { getRun, listProjects, listRuns, listStories, triggerRun, uploadStory } from './api';
 import { useEventStream } from './useEventStream';
 import { PixelCanyon } from './PixelCanyon';
 import { CanyonSpine } from './CanyonSpine';
 import { PixelWordmark } from './PixelWordmark';
 import { StageSprite, StatusMark } from './PixelSprites';
-import type { PipelineEvent, RunSummary, Stage, Status } from './types';
+import type { PipelineEvent, Project, RunSummary, Stage, Status, Story, StoryStatus } from './types';
 
 const STAGE_NAME: Record<Stage, string> = {
   spec: 'Spec',
@@ -50,6 +50,11 @@ export function App() {
   const [runsError, setRunsError] = useState<string>();
   const [selected, setSelected] = useState<string | null>(null); // null = live view
   const [running, setRunning] = useState(false);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectId, setProjectId] = useState('demo');
+  const [stories, setStories] = useState<Story[]>([]);
+  const [storyTitle, setStoryTitle] = useState('');
+  const [storyBody, setStoryBody] = useState('');
 
   const refreshRuns = useCallback(() => {
     listRuns()
@@ -61,7 +66,19 @@ export function App() {
       .finally(() => setRunsLoading(false));
   }, []);
 
+  const refreshStories = useCallback(() => {
+    listStories(projectId)
+      .then(setStories)
+      .catch(() => setStories([]));
+  }, [projectId]);
+
   useEffect(refreshRuns, [refreshRuns]);
+  useEffect(refreshStories, [refreshStories]);
+  useEffect(() => {
+    listProjects()
+      .then(setProjects)
+      .catch(() => setProjects([]));
+  }, []);
 
   // The live run is whichever runId the most recent event belongs to.
   const liveRunId = events.length ? events[events.length - 1].runId : undefined;
@@ -71,18 +88,31 @@ export function App() {
   );
   const runFinished = liveEvents.some((event) => event.stage === 'decision' && event.status !== 'start');
 
-  // When a run finishes, refresh history.
+  // When a run finishes, refresh history + story statuses.
   useEffect(() => {
     if (runFinished) {
       setRunning(false);
       refreshRuns();
+      refreshStories();
     }
-  }, [runFinished, refreshRuns]);
+  }, [runFinished, refreshRuns, refreshStories]);
 
   const onRun = async () => {
     setSelected(null);
     setRunning(true);
     await triggerRun('mock');
+  };
+
+  const onUploadStory = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!storyBody.trim()) {
+      return;
+    }
+    setSelected(null);
+    setRunning(true);
+    await uploadStory({ projectId, title: storyTitle.trim() || undefined, body: storyBody });
+    setStoryTitle('');
+    setStoryBody('');
   };
 
   return (
@@ -96,6 +126,18 @@ export function App() {
           <div className="tagline">AGENTIC&nbsp;QA · LIVE&nbsp;CANYON&nbsp;VIEW</div>
         </div>
         <div className="spacer" />
+        {projects.length > 0 && (
+          <label className="proj">
+            <span className="sr-only">Project</span>
+            <select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <span className="conn" role="status">
           <span className={`dot ${connection}`} aria-hidden /> {connection}
         </span>
@@ -105,8 +147,44 @@ export function App() {
       </header>
 
       <div className="layout">
-        <aside className="panel" aria-label="Run history">
-          <h2>Expeditions</h2>
+        <aside className="rail">
+          <section className="panel" aria-label="Stories">
+            <h2>Stories</h2>
+            <form className="story-form" onSubmit={onUploadStory}>
+              <input
+                className="story-input"
+                value={storyTitle}
+                onChange={(event) => setStoryTitle(event.target.value)}
+                placeholder="Title (optional)"
+                aria-label="Story title"
+              />
+              <textarea
+                className="story-input story-body"
+                value={storyBody}
+                onChange={(event) => setStoryBody(event.target.value)}
+                placeholder="Plain-English testing instructions…"
+                rows={4}
+                aria-label="Story instructions"
+              />
+              <button type="submit" disabled={running || !storyBody.trim()}>
+                {running ? 'Running…' : '▾ Generate test'}
+              </button>
+            </form>
+            {stories.length === 0 ? (
+              <p className="muted">No stories yet for this project.</p>
+            ) : (
+              <ul className="storylist">
+                {stories.map((story) => (
+                  <li key={story.id}>
+                    <span className="story-title">{story.title}</span>
+                    <Chip text={story.status} kind={storyKind(story.status)} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          <section className="panel" aria-label="Run history">
+            <h2>Expeditions</h2>
           {runsError && <p className="muted">Couldn’t load runs: {runsError}</p>}
           <ul className="runlist">
             <li>
@@ -145,6 +223,7 @@ export function App() {
               </>
             )}
           </ul>
+          </section>
         </aside>
 
         <main aria-label="Run detail">
@@ -703,4 +782,10 @@ function ScenarioStrata({ scenario }: { scenario: Scenario }) {
 
 function Chip({ text, kind }: { text: string; kind: 'pass' | 'fail' | 'info' }) {
   return <span className={`badge ${kind}`}>{text}</span>;
+}
+
+function storyKind(status: StoryStatus): 'pass' | 'fail' | 'info' {
+  if (status === 'passing') return 'pass';
+  if (status === 'failing' || status === 'needs-review') return 'fail';
+  return 'info';
 }

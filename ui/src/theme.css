@@ -895,6 +895,76 @@ button.secondary {
   }
 }
 
+/* ---- Project rail + stories (platform Phase A) -------------------------- */
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+}
+.proj select {
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--sand);
+  background: var(--night-3);
+  border: var(--px) solid var(--rim);
+  border-radius: 0;
+  padding: var(--s2) var(--s3);
+}
+.story-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  margin-bottom: var(--s3);
+}
+.story-input {
+  font-family: var(--sans);
+  font-size: var(--t-sm);
+  color: var(--sand);
+  background: var(--night);
+  border: var(--px) solid var(--rim);
+  border-radius: 0;
+  padding: var(--s2) var(--s3);
+}
+.story-input::placeholder {
+  color: var(--sand-dim);
+}
+.story-input:focus-visible {
+  outline: var(--px) dashed var(--sun);
+  outline-offset: 2px;
+}
+.story-body {
+  resize: vertical;
+  min-height: 72px;
+}
+.storylist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  max-height: 32vh;
+  overflow-y: auto;
+}
+.storylist li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+  padding: var(--s2) var(--s3);
+  background: var(--night-3);
+  border: 1px solid var(--rim);
+}
+.story-title {
+  font-size: var(--t-sm);
+  color: var(--sand);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ---- Evidence ----------------------------------------------------------- */
 .evidence {
   background: var(--night);

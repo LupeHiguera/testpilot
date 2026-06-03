@@ -6,6 +6,10 @@ import { projectRoot, runsDir } from '../core/config.js';
 import { ModelMode } from '../core/types.js';
 import { onPipelineEvent } from '../events/bus.js';
 import { runDemoWithServer } from '../pipeline/demo.js';
+import { startDemoServer, stopProcessTree } from '../pipeline/demoServer.js';
+import { runStoryPipeline } from '../pipeline/story.js';
+import { getProject, listProjects } from '../projects/store.js';
+import { addStory, listStories } from '../stories/store.js';
 
 const uiDist = path.join(projectRoot, 'ui', 'dist');
 
@@ -48,6 +52,15 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
   }
   if (pathname === '/api/run' && req.method === 'POST') {
     return triggerRun(req, res);
+  }
+  if (pathname === '/api/projects' && req.method === 'GET') {
+    return sendJson(res, await listProjects());
+  }
+  if (pathname === '/api/stories' && req.method === 'GET') {
+    return sendJson(res, await listStories(url.searchParams.get('projectId') ?? 'demo'));
+  }
+  if (pathname === '/api/stories' && req.method === 'POST') {
+    return triggerStory(req, res);
   }
   if (pathname.startsWith('/artifacts/')) {
     return serveArtifact(decodeURIComponent(pathname.slice('/artifacts/'.length)), res);
@@ -93,6 +106,42 @@ function triggerRun(req: http.IncomingMessage, res: http.ServerResponse) {
       console.error('Live run failed:', error);
     });
     sendJson(res, { started: true, mode }, 202);
+  });
+}
+
+function triggerStory(req: http.IncomingMessage, res: http.ServerResponse) {
+  let body = '';
+  req.on('data', (chunk) => {
+    body += chunk;
+  });
+  req.on('end', async () => {
+    try {
+      const parsed = body ? JSON.parse(body) : {};
+      const project = await getProject(parsed.projectId);
+      if (!project || !parsed.body) {
+        return sendJson(res, { error: 'projectId and body are required' }, 400);
+      }
+      const story = await addStory({
+        projectId: project.id,
+        source: 'upload',
+        title: parsed.title || String(parsed.body).trim().slice(0, 60),
+        body: parsed.body
+      });
+      sendJson(res, { started: true, storyId: story.id }, 202);
+      // testpilot manages the demo app; connected projects run their own dev server.
+      const appServer = project.id === 'demo' ? await startDemoServer() : undefined;
+      try {
+        await runStoryPipeline(project, story, { mode: 'mock' });
+      } catch (error) {
+        console.error('Story run failed:', error);
+      } finally {
+        if (appServer) {
+          stopProcessTree(appServer.pid);
+        }
+      }
+    } catch (error) {
+      sendJson(res, { error: String(error) }, 500);
+    }
   });
 }
 

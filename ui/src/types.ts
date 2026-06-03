@@ -20,3 +20,23 @@ export interface RunSummary {
     regression?: string;
   };
 }
+
+export interface Project {
+  id: string;
+  name: string;
+  baseUrl: string;
+  repoPath: string;
+  testsDir: string;
+  runnable: boolean;
+}
+
+export type StoryStatus = 'new' | 'generated' | 'passing' | 'failing' | 'needs-review';
+
+export interface Story {
+  id: string;
+  projectId: string;
+  source: string;
+  title: string;
+  status: StoryStatus;
+  createdAt: number;
+}

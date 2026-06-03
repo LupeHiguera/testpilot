@@ -1,4 +1,4 @@
-import type { RunSummary } from './types';
+import type { Project, RunSummary, Story } from './types';
 
 export async function listRuns(): Promise<RunSummary[]> {
   const response = await fetch('/api/runs');
@@ -21,5 +21,29 @@ export async function triggerRun(mode: 'mock' | 'openai' = 'mock'): Promise<void
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ mode })
+  });
+}
+
+export async function listProjects(): Promise<Project[]> {
+  const response = await fetch('/api/projects');
+  if (!response.ok) {
+    throw new Error(`Failed to load projects (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function listStories(projectId: string): Promise<Story[]> {
+  const response = await fetch(`/api/stories?projectId=${encodeURIComponent(projectId)}`);
+  if (!response.ok) {
+    throw new Error(`Failed to load stories (${response.status})`);
+  }
+  return response.json();
+}
+
+export async function uploadStory(input: { projectId: string; title?: string; body: string }): Promise<void> {
+  await fetch('/api/stories', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input)
   });
 }
