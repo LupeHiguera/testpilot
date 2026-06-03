@@ -7,6 +7,7 @@ runs/*
 !runs/.gitignore
 grading/
 .testpilot/
+docs/testpilot/
 tests/generated/*
 !tests/generated/.gitignore
 .claude/settings.local.json

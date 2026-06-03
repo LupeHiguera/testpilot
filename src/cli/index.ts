@@ -4,6 +4,7 @@ import path from 'node:path';
 import { Command } from 'commander';
 import { observePage } from '../browser/observePage.js';
 import { createRunDir, defaultBaseUrl, generatedTestsDir } from '../core/config.js';
+import { generateDocs } from '../docs/generateDocs.js';
 import { ModelMode } from '../core/types.js';
 import { diagnoseFailure } from '../diagnosis/diagnoseFailure.js';
 import { generatePlaywrightTest } from '../generator/generatePlaywrightTest.js';
@@ -214,6 +215,21 @@ specCmd
         stopProcessTree(server.pid);
       }
     }
+  });
+
+program
+  .command('docs')
+  .description('Generate living documentation for a connected project')
+  .argument('<project-id>')
+  .action(async (projectId) => {
+    const project = await getProject(projectId);
+    if (!project) {
+      console.error(`Unknown project: ${projectId}`);
+      process.exitCode = 1;
+      return;
+    }
+    const result = await generateDocs(project);
+    console.log(`Generated docs for ${result.flowCount} flow(s) → ${result.indexPath}`);
   });
 
 program
