@@ -108,7 +108,17 @@ export class OpenAiModelClient implements ModelClient {
       input: [
         {
           role: 'system',
-          content: 'Repair only safe Playwright generated-test drift. Return the full repaired file content only.'
+          content: [
+            'You repair a Playwright test that failed due to safe UI drift, preserving the original test intent.',
+            'Rules:',
+            '- Return the full repaired TypeScript file content only — no markdown fences, no prose.',
+            '- For copy or selector drift, replace the brittle locator with a resilient one. When a submit button label changed, use a role locator whose name matches BOTH the old and new text via a regex, e.g.',
+            "    page.getByRole('button', { name: /^(Sign in|Log in)$/ })",
+            '  Never hardcode only the new label — the repaired test must still pass against the original UI too.',
+            '- Preserve every assertion and the expected business outcome: keep the toHaveURL check against the expected path and the visible expected text. Do not weaken or remove assertions.',
+            "- Keep the navigation contract: new URL(process.env.BASE_URL ?? 'http://127.0.0.1:3000') with target.pathname, preserving the query string.",
+            '- Do not change the credentials, expected path, or expected text.'
+          ].join('\n')
         },
         {
           role: 'user',

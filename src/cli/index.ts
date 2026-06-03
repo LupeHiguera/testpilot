@@ -150,6 +150,9 @@ async function runDemo(mode: ModelMode, model: string | undefined, baseUrl: stri
   const runDir = createRunDir('demo');
   const observation = await observePage(baseUrl, intent.route, runDir);
   const testPath = await generatePlaywrightTest(client, intent, observation);
+  // Snapshot the pristine generated test so later scenarios (e.g. regression)
+  // can run independently of any repair applied to the shared test file.
+  const pristineTest = await fs.readFile(testPath, 'utf8');
 
   const normalRun = await runPlaywrightTest({ testPath, baseUrl, route: intent.route });
   const copyRun = await runPlaywrightTest({ testPath, baseUrl: withVariant(baseUrl, 'copy-change'), route: intent.route, variant: 'copy-change' });
@@ -177,6 +180,10 @@ async function runDemo(mode: ModelMode, model: string | undefined, baseUrl: stri
     prBundleDir = pr.bundleDir;
   }
 
+  // Regression is an independent scenario: run it against the pristine generated
+  // test, not the copy-change-repaired one, so the failure reflects the broken
+  // routing rather than a leftover selector mismatch.
+  await fs.writeFile(testPath, pristineTest, 'utf8');
   const regressionRun = await runPlaywrightTest({ testPath, baseUrl: withVariant(baseUrl, 'regression'), route: intent.route, variant: 'regression' });
   const regressionDiagnosis = await diagnoseFailure(regressionRun, intent, client, { vision: true });
 
