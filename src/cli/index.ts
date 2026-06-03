@@ -1,8 +1,10 @@
 #!/usr/bin/env node
+import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Command } from 'commander';
 import { observePage } from '../browser/observePage.js';
+import { fetchGithubStories } from '../connectors/github.js';
 import { createRunDir, defaultBaseUrl, generatedTestsDir } from '../core/config.js';
 import { generateDocs } from '../docs/generateDocs.js';
 import { ModelMode } from '../core/types.js';
@@ -217,6 +219,47 @@ specCmd
     }
   });
 
+specCmd
+  .command('pull')
+  .description('Pull GitHub issues as stories via the GitHub MCP server')
+  .argument('<project-id>')
+  .requiredOption('--owner <owner>', 'GitHub repo owner')
+  .requiredOption('--repo <repo>', 'GitHub repo name')
+  .option('--label <label>', 'Only issues with this label')
+  .option('--generate', 'Generate a test for each pulled story')
+  .option('--mode <mode>', 'Model mode for --generate', 'mock')
+  .action(async (projectId, options) => {
+    const project = await getProject(projectId);
+    if (!project) {
+      console.error(`Unknown project: ${projectId}`);
+      process.exitCode = 1;
+      return;
+    }
+    const token = await resolveGithubToken();
+    if (!token) {
+      console.error('No GitHub token found. Set GITHUB_TOKEN or run `gh auth login`.');
+      process.exitCode = 1;
+      return;
+    }
+    const mapped = await fetchGithubStories({ owner: options.owner, repo: options.repo, label: options.label }, token);
+    console.log(`Pulled ${mapped.length} issue(s) from ${options.owner}/${options.repo}`);
+    for (const item of mapped) {
+      const story = await addStory({ projectId: project.id, source: 'github', externalId: item.externalId, title: item.title, body: item.body });
+      console.log(`  ${story.externalId}  ${story.title}`);
+      if (options.generate) {
+        const appServer = project.id === 'demo' ? await startDemoServer() : undefined;
+        try {
+          const result = await runStoryPipeline(project, story, { mode: options.mode as ModelMode });
+          console.log(`    → ${result.status}`);
+        } finally {
+          if (appServer) {
+            stopProcessTree(appServer.pid);
+          }
+        }
+      }
+    }
+  });
+
 program
   .command('docs')
   .description('Generate living documentation for a connected project')
@@ -246,3 +289,22 @@ program.parseAsync().catch((error) => {
 });
 
 await fs.mkdir(generatedTestsDir, { recursive: true });
+
+async function resolveGithubToken(): Promise<string | undefined> {
+  if (process.env.GITHUB_TOKEN) {
+    return process.env.GITHUB_TOKEN;
+  }
+  if (process.env.GH_TOKEN) {
+    return process.env.GH_TOKEN;
+  }
+  return new Promise((resolve) => {
+    const child =
+      process.platform === 'win32' ? spawn('cmd.exe', ['/c', 'gh', 'auth', 'token']) : spawn('gh', ['auth', 'token']);
+    let out = '';
+    child.stdout?.on('data', (chunk) => {
+      out += chunk.toString();
+    });
+    child.on('error', () => resolve(undefined));
+    child.on('close', () => resolve(out.trim() || undefined));
+  });
+}
