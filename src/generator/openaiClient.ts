@@ -71,7 +71,18 @@ export class OpenAiModelClient implements ModelClient {
       input: [
         {
           role: 'system',
-          content: 'Generate one concise Playwright TypeScript test. Return code only, no markdown.'
+          content: [
+            'Generate exactly one Playwright TypeScript test. Return code only — no markdown fences, no prose.',
+            'Requirements:',
+            "- import { test, expect } from '@playwright/test'.",
+            '- Navigate using this exact pattern so the base URL and any query string (test variant) are preserved:',
+            "    const target = new URL(process.env.BASE_URL ?? 'http://127.0.0.1:3000');",
+            "    target.pathname = intent.route;",
+            '    await page.goto(target.toString());',
+            "- Prefer accessible locators: page.getByLabel(...) for inputs and page.getByRole('button', { name: ... }) for the submit button.",
+            '- Fill the credentials, click the submit button, then assert both the expected URL (toHaveURL) and that the expected text is visible (getByText).',
+            '- Use the route, credentials, submit text, expected path, and expected text from the provided intent. Do not remove or weaken assertions.'
+          ].join('\n')
         },
         {
           role: 'user',

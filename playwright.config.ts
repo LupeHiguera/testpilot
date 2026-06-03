@@ -7,6 +7,7 @@ export default defineConfig({
   retries: 0,
   reporter: [['list']],
   use: {
+    baseURL: process.env.BASE_URL,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'off'
