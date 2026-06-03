@@ -242,8 +242,14 @@ async function startDemoServer() {
   const child = spawnCommand('npx', ['vite', '--host', '127.0.0.1', '--port', '3000'], {
     cwd: projectRoot,
     shell: false,
-    stdio: 'pipe'
+    // No pipes to read keeps the CLI's event loop from being held open, and a
+    // detached process group (POSIX) lets us kill vite and its children together.
+    stdio: 'ignore',
+    detached: process.platform !== 'win32'
   });
+  // The server's lifecycle is managed explicitly by stopProcessTree; never let it
+  // keep the process alive on its own (which would hang the CLI in CI).
+  child.unref();
   await waitForServer(defaultBaseUrl);
   return child;
 }
@@ -280,9 +286,14 @@ function stopProcessTree(pid: number | undefined) {
     spawn('taskkill.exe', ['/pid', String(pid), '/t', '/f'], { stdio: 'ignore' });
     return;
   }
+  // Kill the whole process group (vite + its children), not just the npx wrapper.
   try {
-    process.kill(pid);
+    process.kill(-pid, 'SIGKILL');
   } catch {
-    // Process already exited.
+    try {
+      process.kill(pid, 'SIGKILL');
+    } catch {
+      // Process already exited.
+    }
   }
 }
