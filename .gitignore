@@ -6,3 +6,4 @@ runs/*
 !runs/.gitignore
 tests/generated/*
 !tests/generated/.gitignore
+.claude/settings.local.json

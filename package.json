@@ -12,6 +12,8 @@
     "build": "tsc --noEmit",
     "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts",
+    "validate": "npm run build && npm run test",
+    "validate:demo": "npm run validate && npm run testpilot -- demo --mode mock",
     "playwright:install": "playwright install chromium"
   },
   "dependencies": {

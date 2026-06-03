@@ -9,6 +9,7 @@ import { ModelMode } from '../core/types.js';
 import { classifyFailure } from '../diagnosis/classifyFailure.js';
 import { generatePlaywrightTest } from '../generator/generatePlaywrightTest.js';
 import { createModelClient } from '../generator/modelClient.js';
+import { createRepairPr } from '../pr/createRepairPr.js';
 import { applyRepair } from '../repair/applyPatch.js';
 import { proposePatch } from '../repair/proposePatch.js';
 import { validatePatch } from '../repair/validatePatch.js';
@@ -78,6 +79,8 @@ program
   .argument('<spec-file>')
   .option('--mode <mode>', 'Model mode: mock or openai', 'mock')
   .option('--model <model>', 'OpenAI model')
+  .option('--open-pr', 'Open a GitHub PR for the repair instead of only writing a local bundle')
+  .option('--base-branch <branch>', 'Base branch for the PR', 'main')
   .action(async (testFile, runResultJson, specFile, options) => {
     const client = createModelClient(options.mode as ModelMode, options.model);
     const spec = await fs.readFile(path.resolve(specFile), 'utf8');
@@ -90,11 +93,30 @@ program
       runResult
     });
     const validation = validatePatch(proposal, diagnosis);
-    if (validation.valid) {
-      await applyRepair(proposal);
-      console.log(`Applied repair: ${validation.reason}`);
-    } else {
+    if (!validation.valid) {
       console.log(`Refused repair: ${validation.reason}`);
+      return;
+    }
+    await applyRepair(proposal);
+    console.log(`Applied repair: ${validation.reason}`);
+
+    const pr = await createRepairPr({
+      testPath: path.resolve(testFile),
+      proposal,
+      diagnosis,
+      intent,
+      runDir: createRunDir('repair'),
+      beforeScreenshot: runResult.failureArtifacts?.screenshotPath,
+      baseBranch: options.baseBranch,
+      openPr: Boolean(options.openPr)
+    });
+    if (pr.opened) {
+      console.log(`Opened PR: ${pr.prUrl}`);
+    } else {
+      if (pr.skippedReason) {
+        console.log(pr.skippedReason);
+      }
+      console.log(`PR bundle: ${pr.bundleDir}`);
     }
   });
 
@@ -134,10 +156,23 @@ async function runDemo(mode: ModelMode, model: string | undefined, baseUrl: stri
   const validation = validatePatch(proposal, diagnosis);
   let repairApplied = false;
   let repairedRun = copyRun;
+  let prBundleDir: string | undefined;
   if (validation.valid) {
     await applyRepair(proposal);
     repairApplied = true;
     repairedRun = await runPlaywrightTest({ testPath, baseUrl: withVariant(baseUrl, 'copy-change'), route: intent.route, variant: 'copy-change' });
+    const afterObservation = await observePage(withVariant(baseUrl, 'copy-change'), intent.route, createRunDir('demo-after'));
+    const pr = await createRepairPr({
+      testPath,
+      proposal,
+      diagnosis,
+      intent,
+      runDir,
+      beforeScreenshot: copyRun.failureArtifacts?.screenshotPath,
+      afterScreenshot: afterObservation.screenshotPath,
+      openPr: false
+    });
+    prBundleDir = pr.bundleDir;
   }
 
   const regressionRun = await runPlaywrightTest({ testPath, baseUrl: withVariant(baseUrl, 'regression'), route: intent.route, variant: 'regression' });
@@ -176,9 +211,12 @@ async function runDemo(mode: ModelMode, model: string | undefined, baseUrl: stri
 
   await fs.writeFile(
     path.join(runDir, 'demo-summary.json'),
-    JSON.stringify({ normalRun, copyRun, diagnosis, validation, repairApplied, repairedRun, regressionRun, regressionDiagnosis }, null, 2),
+    JSON.stringify({ normalRun, copyRun, diagnosis, validation, repairApplied, repairedRun, regressionRun, regressionDiagnosis, prBundleDir }, null, 2),
     'utf8'
   );
+  if (prBundleDir) {
+    console.log(`Repair PR bundle ${prBundleDir}`);
+  }
   return reportPath;
 }
 
