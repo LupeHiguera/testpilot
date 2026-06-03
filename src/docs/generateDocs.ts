@@ -4,7 +4,7 @@ import { TestIntent } from '../core/types.js';
 import { createModelClient } from '../generator/modelClient.js';
 import { Project } from '../projects/types.js';
 import { listStories } from '../stories/store.js';
-import { Story, StoryStatus } from '../stories/types.js';
+import { StoryStatus } from '../stories/types.js';
 
 const STATUS_BADGE: Record<StoryStatus, string> = {
   passing: '✅ passing',
@@ -14,29 +14,60 @@ const STATUS_BADGE: Record<StoryStatus, string> = {
   new: '◷ new'
 };
 
+export interface FlowDoc {
+  storyId: string;
+  title: string;
+  status: StoryStatus;
+  source: string;
+  testRef: string;
+  instructions: string;
+  steps: string[];
+}
+
+export interface DocsModel {
+  project: { id: string; name: string; baseUrl: string };
+  flows: FlowDoc[];
+}
+
 export interface DocsResult {
   indexPath: string;
   flowCount: number;
 }
 
 /**
- * Living documentation: for each story, write a flow doc (instructions + derived
- * steps + status) backed by its test, plus an index. Because each flow is tied to
- * a test, a failing status flags docs that no longer match the product.
+ * Build the structured living-docs model for a project: one flow per story, with
+ * derived steps and a status tied to the flow's test. Shared by the markdown
+ * writer (generateDocs) and the dashboard's docs API so they never drift.
  */
-export async function generateDocs(project: Project): Promise<DocsResult> {
+export async function buildDocsModel(project: Project): Promise<DocsModel> {
   const stories = await listStories(project.id);
   const client = createModelClient('mock');
+  const flows: FlowDoc[] = [];
+  for (const story of stories) {
+    const intent = await client.parseSpec(story.body);
+    flows.push({
+      storyId: story.id,
+      title: story.title,
+      status: story.status,
+      source: story.source,
+      testRef: `${project.testsDir.split(path.sep).join('/')}/${story.id}.spec.ts`,
+      instructions: story.body.trim(),
+      steps: deriveSteps(intent)
+    });
+  }
+  return { project: { id: project.id, name: project.name, baseUrl: project.baseUrl }, flows };
+}
+
+/** Write living documentation (index + per-flow markdown) into the project's docs dir. */
+export async function generateDocs(project: Project): Promise<DocsResult> {
+  const model = await buildDocsModel(project);
   const outDir = path.join(project.repoPath, project.docsDir, 'testpilot');
   await fs.mkdir(outDir, { recursive: true });
 
   const rows: string[] = [];
-  for (const story of stories) {
-    const intent = await client.parseSpec(story.body);
-    const flowFile = `${story.id}.md`;
-    const testRef = `${project.testsDir.split(path.sep).join('/')}/${story.id}.spec.ts`;
-    await fs.writeFile(path.join(outDir, flowFile), flowDoc(story, intent, testRef), 'utf8');
-    rows.push(`| ${escapePipe(story.title)} | ${STATUS_BADGE[story.status]} | \`${testRef}\` | [doc](./${flowFile}) |`);
+  for (const flow of model.flows) {
+    await fs.writeFile(path.join(outDir, `${flow.storyId}.md`), flowMarkdown(flow), 'utf8');
+    rows.push(`| ${escapePipe(flow.title)} | ${STATUS_BADGE[flow.status]} | \`${flow.testRef}\` | [doc](./${flow.storyId}.md) |`);
   }
 
   const index = [
@@ -54,33 +85,41 @@ export async function generateDocs(project: Project): Promise<DocsResult> {
   ].join('\n');
   const indexPath = path.join(outDir, 'index.md');
   await fs.writeFile(indexPath, index, 'utf8');
-  return { indexPath, flowCount: stories.length };
+  return { indexPath, flowCount: model.flows.length };
 }
 
-function flowDoc(story: Story, intent: TestIntent, testRef: string): string {
+export function statusBadge(status: StoryStatus): string {
+  return STATUS_BADGE[status];
+}
+
+function deriveSteps(intent: TestIntent): string[] {
+  return [
+    `Navigate to ${intent.route}`,
+    intent.credentials ? `Enter credentials (${intent.credentials.email})` : '',
+    `Click the submit control ("${intent.submitText}")`,
+    `Expect to reach ${intent.expectedPath} with "${intent.expectedText}" visible`
+  ].filter((step) => step !== '');
+}
+
+function flowMarkdown(flow: FlowDoc): string {
   return (
     [
-      `# ${story.title}`,
+      `# ${flow.title}`,
       '',
-      `**Status:** ${STATUS_BADGE[story.status]} · backed by \`${testRef}\``,
-      `**Source:** ${story.source}${story.externalId ? ` ${story.externalId}` : ''}`,
+      `**Status:** ${STATUS_BADGE[flow.status]} · backed by \`${flow.testRef}\``,
+      `**Source:** ${flow.source}`,
       '',
       '## Instructions',
       '',
-      story.body.trim(),
+      flow.instructions,
       '',
       '## Flow',
       '',
-      `1. Navigate to \`${intent.route}\``,
-      intent.credentials ? `2. Enter credentials (\`${intent.credentials.email}\`)` : '',
-      `3. Click the submit control ("${intent.submitText}")`,
-      `4. Expect to reach \`${intent.expectedPath}\` with "${intent.expectedText}" visible`,
+      ...flow.steps.map((step, index) => `${index + 1}. ${step}`),
       '',
       '_This page is backed by an automated test; if the test fails, this flow is flagged for review._',
       ''
-    ]
-      .filter((line) => line !== '')
-      .join('\n') + '\n'
+    ].join('\n')
   );
 }
 

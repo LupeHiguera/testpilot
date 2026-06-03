@@ -1,11 +1,11 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import { getRun, listProjects, listRuns, listStories, triggerRun, uploadStory } from './api';
+import { getDocs, getRun, listProjects, listRuns, listStories, triggerRun, uploadStory, writeDocs } from './api';
 import { useEventStream } from './useEventStream';
 import { PixelCanyon } from './PixelCanyon';
 import { CanyonSpine } from './CanyonSpine';
 import { PixelWordmark } from './PixelWordmark';
 import { StageSprite, StatusMark } from './PixelSprites';
-import type { PipelineEvent, Project, RunSummary, Stage, Status, Story, StoryStatus } from './types';
+import type { DocsModel, PipelineEvent, Project, RunSummary, Stage, Status, Story, StoryStatus } from './types';
 
 const STAGE_NAME: Record<Stage, string> = {
   spec: 'Spec',
@@ -50,6 +50,7 @@ export function App() {
   const [runsError, setRunsError] = useState<string>();
   const [selected, setSelected] = useState<string | null>(null); // null = live view
   const [running, setRunning] = useState(false);
+  const [mode, setMode] = useState<'runs' | 'docs'>('runs');
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState('demo');
   const [stories, setStories] = useState<Story[]>([]);
@@ -126,6 +127,14 @@ export function App() {
           <div className="tagline">AGENTIC&nbsp;QA · LIVE&nbsp;CANYON&nbsp;VIEW</div>
         </div>
         <div className="spacer" />
+        <div className="viewtabs" role="tablist" aria-label="View">
+          <button role="tab" aria-selected={mode === 'runs'} className={mode === 'runs' ? 'active' : ''} onClick={() => setMode('runs')}>
+            Live
+          </button>
+          <button role="tab" aria-selected={mode === 'docs'} className={mode === 'docs' ? 'active' : ''} onClick={() => setMode('docs')}>
+            Docs
+          </button>
+        </div>
         {projects.length > 0 && (
           <label className="proj">
             <span className="sr-only">Project</span>
@@ -226,8 +235,10 @@ export function App() {
           </section>
         </aside>
 
-        <main aria-label="Run detail">
-          {selected === null ? (
+        <main aria-label={mode === 'docs' ? 'Documentation' : 'Run detail'}>
+          {mode === 'docs' ? (
+            <DocsView projectId={projectId} />
+          ) : selected === null ? (
             <LiveCanyon events={liveEvents} connection={connection} />
           ) : (
             <PastRun runId={selected} />
@@ -788,4 +799,75 @@ function storyKind(status: StoryStatus): 'pass' | 'fail' | 'info' {
   if (status === 'passing') return 'pass';
   if (status === 'failing' || status === 'needs-review') return 'fail';
   return 'info';
+}
+
+function DocsView({ projectId }: { projectId: string }) {
+  const [docs, setDocs] = useState<DocsModel | null>(null);
+  const [error, setError] = useState<string>();
+  const [written, setWritten] = useState<string>();
+
+  const load = useCallback(() => {
+    setDocs(null);
+    setError(undefined);
+    setWritten(undefined);
+    getDocs(projectId)
+      .then(setDocs)
+      .catch((e: Error) => setError(e.message));
+  }, [projectId]);
+
+  useEffect(load, [load]);
+
+  const onWrite = async () => {
+    const result = await writeDocs(projectId);
+    setWritten(`Wrote ${result.flowCount} flow(s) → ${result.indexPath}`);
+  };
+
+  if (error) {
+    return (
+      <div className="panel hero">
+        <p className="muted">Couldn’t load docs: {error}</p>
+      </div>
+    );
+  }
+  if (!docs) {
+    return (
+      <div className="panel hero">
+        <p className="muted">Loading…</p>
+      </div>
+    );
+  }
+  return (
+    <div className="panel docs">
+      <div className="docs-head">
+        <h2>{docs.project.name} — Living Docs</h2>
+        <button className="secondary" onClick={onWrite}>
+          ▾ Write to repo
+        </button>
+      </div>
+      {written && <p className="muted docs-written">{written}</p>}
+      {docs.flows.length === 0 ? (
+        <p className="muted">No stories yet — upload one to document a flow.</p>
+      ) : (
+        <div className="doclist">
+          {docs.flows.map((flow) => (
+            <article className="doc-card" key={flow.storyId}>
+              <header className="doc-card-head">
+                <h3>{flow.title}</h3>
+                <Chip text={flow.status} kind={storyKind(flow.status)} />
+              </header>
+              <p className="doc-instr">{flow.instructions}</p>
+              <ol className="doc-steps">
+                {flow.steps.map((step, index) => (
+                  <li key={index}>{step}</li>
+                ))}
+              </ol>
+              <p className="doc-test">
+                backed by <code>{flow.testRef}</code> · source {flow.source}
+              </p>
+            </article>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }

@@ -114,10 +114,14 @@ npm run ui:build      # build the dashboard (ui/ -> ui/dist)
 npm run serve         # open http://127.0.0.1:4000, then press "Run demo" or upload a story
 ```
 
+Toggle the topbar to **Docs** to browse the selected project's living documentation
+(each flow's instructions, derived steps, and test-backed status) and write it into
+the repo.
+
 The server (`src/server`) exposes `GET /events` (SSE), `GET /api/runs`,
-`GET /artifacts/*`, `GET /api/projects`, `GET /api/stories`, and `POST` endpoints to
-trigger runs and stories. For UI development, `npm run ui:dev` runs the Vite app with
-a dev proxy to the server.
+`GET /artifacts/*`, `GET /api/projects`, `GET /api/stories`, `GET /api/docs`, and
+`POST` endpoints to trigger runs, stories, and docs. For UI development,
+`npm run ui:dev` runs the Vite app with a dev proxy to the server.
 
 ---
 

@@ -40,3 +40,18 @@ export interface Story {
   status: StoryStatus;
   createdAt: number;
 }
+
+export interface FlowDoc {
+  storyId: string;
+  title: string;
+  status: StoryStatus;
+  source: string;
+  testRef: string;
+  instructions: string;
+  steps: string[];
+}
+
+export interface DocsModel {
+  project: { id: string; name: string; baseUrl: string };
+  flows: FlowDoc[];
+}

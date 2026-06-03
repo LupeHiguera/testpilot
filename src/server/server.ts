@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { projectRoot, runsDir } from '../core/config.js';
 import { ModelMode } from '../core/types.js';
+import { buildDocsModel, generateDocs } from '../docs/generateDocs.js';
 import { onPipelineEvent } from '../events/bus.js';
 import { runDemoWithServer } from '../pipeline/demo.js';
 import { startDemoServer, stopProcessTree } from '../pipeline/demoServer.js';
@@ -61,6 +62,13 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
   }
   if (pathname === '/api/stories' && req.method === 'POST') {
     return triggerStory(req, res);
+  }
+  if (pathname === '/api/docs' && req.method === 'GET') {
+    const project = await getProject(url.searchParams.get('projectId') ?? 'demo');
+    return project ? sendJson(res, await buildDocsModel(project)) : sendJson(res, { error: 'unknown project' }, 404);
+  }
+  if (pathname === '/api/docs' && req.method === 'POST') {
+    return triggerDocs(req, res);
   }
   if (pathname.startsWith('/artifacts/')) {
     return serveArtifact(decodeURIComponent(pathname.slice('/artifacts/'.length)), res);
@@ -139,6 +147,26 @@ function triggerStory(req: http.IncomingMessage, res: http.ServerResponse) {
           stopProcessTree(appServer.pid);
         }
       }
+    } catch (error) {
+      sendJson(res, { error: String(error) }, 500);
+    }
+  });
+}
+
+function triggerDocs(req: http.IncomingMessage, res: http.ServerResponse) {
+  let body = '';
+  req.on('data', (chunk) => {
+    body += chunk;
+  });
+  req.on('end', async () => {
+    try {
+      const parsed = body ? JSON.parse(body) : {};
+      const project = await getProject(parsed.projectId);
+      if (!project) {
+        return sendJson(res, { error: 'unknown project' }, 400);
+      }
+      const result = await generateDocs(project);
+      sendJson(res, result);
     } catch (error) {
       sendJson(res, { error: String(error) }, 500);
     }
