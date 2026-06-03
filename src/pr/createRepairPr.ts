@@ -42,9 +42,18 @@ const SAFE_BODY_NOTE =
   'This repair was produced by testpilot and limited to a validated safe-drift category. ' +
   'It preserves the original assertions and expected outcome. Human review is still required before merge.';
 
+/** Deterministic branch name for a repair, derived from the diagnosis and a timestamp. */
+export function repairBranchName(category: string, stamp: string): string {
+  const slug = category.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  return `testpilot/repair-${slug}-${stamp}`;
+}
+
 /**
  * Pure builder for the PR branch name, title, and markdown body. Kept separate
  * from any git/network side effects so it can be unit tested deterministically.
+ * `beforeImageRef`/`afterImageRef` are the markdown image sources to embed:
+ * relative paths (`./before.png`) for a local bundle, or absolute raw URLs for
+ * a real PR. When omitted, no image is rendered.
  */
 export function buildRepairPrContent(input: {
   testPath: string;
@@ -52,24 +61,23 @@ export function buildRepairPrContent(input: {
   diagnosis: Diagnosis;
   intent: TestIntent;
   baseBranch?: string;
-  hasBeforeScreenshot?: boolean;
-  hasAfterScreenshot?: boolean;
+  beforeImageRef?: string;
+  afterImageRef?: string;
   stamp?: string;
 }): RepairPrContent {
   const stamp = input.stamp ?? new Date().toISOString().replace(/[:.]/g, '-');
   const fileName = path.basename(input.testPath);
-  const categorySlug = input.diagnosis.category.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-  const branch = `testpilot/repair-${categorySlug}-${stamp}`;
+  const branch = repairBranchName(input.diagnosis.category, stamp);
   const title = `testpilot: repair ${input.diagnosis.category} in ${fileName}`;
 
   const screenshotLines: string[] = [];
-  if (input.hasBeforeScreenshot || input.hasAfterScreenshot) {
+  if (input.beforeImageRef || input.afterImageRef) {
     screenshotLines.push('## Before / after', '');
-    if (input.hasBeforeScreenshot) {
-      screenshotLines.push('Before (failing state):', '', '![before](./before.png)', '');
+    if (input.beforeImageRef) {
+      screenshotLines.push('Before (failing state):', '', `![before](${input.beforeImageRef})`, '');
     }
-    if (input.hasAfterScreenshot) {
-      screenshotLines.push('After (repaired state):', '', '![after](./after.png)', '');
+    if (input.afterImageRef) {
+      screenshotLines.push('After (repaired state):', '', `![after](${input.afterImageRef})`, '');
     }
   }
 
@@ -118,38 +126,37 @@ export async function createRepairPr(input: CreateRepairPrInput): Promise<Repair
   }
 
   const baseBranch = input.baseBranch ?? 'main';
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+
+  const bundleDir = path.join(input.runDir, 'pr');
+  await fs.mkdir(bundleDir, { recursive: true });
+  await copyIfPresent(input.beforeScreenshot, path.join(bundleDir, 'before.png'));
+  await copyIfPresent(input.afterScreenshot, path.join(bundleDir, 'after.png'));
+
+  // Local bundle uses relative refs that resolve when viewing the bundle folder.
   const content = buildRepairPrContent({
     testPath: input.testPath,
     proposal: input.proposal,
     diagnosis: input.diagnosis,
     intent: input.intent,
     baseBranch,
-    hasBeforeScreenshot: Boolean(input.beforeScreenshot),
-    hasAfterScreenshot: Boolean(input.afterScreenshot)
+    stamp,
+    beforeImageRef: input.beforeScreenshot ? './before.png' : undefined,
+    afterImageRef: input.afterScreenshot ? './after.png' : undefined
   });
 
-  const bundleDir = path.join(input.runDir, 'pr');
-  await fs.mkdir(bundleDir, { recursive: true });
   const bodyPath = path.join(bundleDir, 'pr-body.md');
   await fs.writeFile(bodyPath, content.body, 'utf8');
   await fs.writeFile(
     path.join(bundleDir, 'pr-meta.json'),
     JSON.stringify(
-      {
-        branch: content.branch,
-        title: content.title,
-        baseBranch,
-        testPath: input.testPath,
-        category: input.diagnosis.category
-      },
+      { branch: content.branch, title: content.title, baseBranch, testPath: input.testPath, category: input.diagnosis.category },
       null,
       2
     ),
     'utf8'
   );
   await fs.writeFile(path.join(bundleDir, 'repaired-test.ts'), input.proposal.proposedContent, 'utf8');
-  await copyIfPresent(input.beforeScreenshot, path.join(bundleDir, 'before.png'));
-  await copyIfPresent(input.afterScreenshot, path.join(bundleDir, 'after.png'));
 
   const result: RepairPrResult = {
     branch: content.branch,
@@ -173,9 +180,15 @@ export async function createRepairPr(input: CreateRepairPrInput): Promise<Repair
     result.prUrl = await openGithubPr({
       branch: content.branch,
       title: content.title,
-      bodyPath,
       baseBranch,
-      testPath: input.testPath
+      stamp,
+      testPath: input.testPath,
+      proposal: input.proposal,
+      diagnosis: input.diagnosis,
+      intent: input.intent,
+      beforeScreenshot: input.beforeScreenshot,
+      afterScreenshot: input.afterScreenshot,
+      bodyPath
     });
     result.opened = true;
   } catch (error) {
@@ -208,16 +221,58 @@ async function checkPrPrerequisites(): Promise<string | undefined> {
 async function openGithubPr(input: {
   branch: string;
   title: string;
-  bodyPath: string;
   baseBranch: string;
+  stamp: string;
   testPath: string;
+  proposal: RepairProposal;
+  diagnosis: Diagnosis;
+  intent: TestIntent;
+  beforeScreenshot?: string;
+  afterScreenshot?: string;
+  bodyPath: string;
 }): Promise<string> {
   const relTest = path.relative(projectRoot, input.testPath);
+  const ownerRepo = parseGithubOwnerRepo((await runCommand('git', ['remote', 'get-url', 'origin'])).stdout);
+
+  // Stage tracked copies of the screenshots so they can be committed to the
+  // branch and referenced by absolute raw URL in the PR body (relative paths do
+  // not render in PR descriptions).
+  const imageDirRel = path.join('.testpilot', 'pr', input.stamp);
+  let beforeRepoPath: string | undefined;
+  let afterRepoPath: string | undefined;
+  if (input.beforeScreenshot || input.afterScreenshot) {
+    await fs.mkdir(path.join(projectRoot, imageDirRel), { recursive: true });
+    beforeRepoPath = await copyIntoRepo(input.beforeScreenshot, path.join(imageDirRel, 'before.png'));
+    afterRepoPath = await copyIntoRepo(input.afterScreenshot, path.join(imageDirRel, 'after.png'));
+  }
+
   await git(['switch', '-c', input.branch]);
   // Force-add so a generated test that is gitignored in the demo still lands in the PR branch.
   await git(['add', '--force', relTest]);
-  // Scope the commit to only the repaired test so nothing else staged (e.g. drafts) leaks in.
-  await git(['commit', '-m', input.title, '--', relTest]);
+  const commitPaths = [relTest];
+  if (beforeRepoPath || afterRepoPath) {
+    await git(['add', '--force', imageDirRel]);
+    commitPaths.push(imageDirRel);
+  }
+  // Scope the commit to only these paths so nothing else staged (e.g. drafts) leaks in.
+  await git(['commit', '-m', input.title, '--', ...commitPaths]);
+  const sha = (await git(['rev-parse', 'HEAD'])).stdout.trim();
+
+  // Rebuild the body with absolute raw URLs (pinned to the commit SHA) so the
+  // before/after images render on GitHub. Fall back to relative refs if we
+  // could not determine owner/repo.
+  const body = buildRepairPrContent({
+    testPath: input.testPath,
+    proposal: input.proposal,
+    diagnosis: input.diagnosis,
+    intent: input.intent,
+    baseBranch: input.baseBranch,
+    stamp: input.stamp,
+    beforeImageRef: imageRef(ownerRepo, sha, beforeRepoPath, './before.png'),
+    afterImageRef: imageRef(ownerRepo, sha, afterRepoPath, './after.png')
+  }).body;
+  await fs.writeFile(input.bodyPath, body, 'utf8');
+
   await git(['push', '-u', 'origin', input.branch]);
   const pr = await runCommand('gh', [
     'pr',
@@ -235,6 +290,44 @@ async function openGithubPr(input: {
     throw new Error(pr.stderr || pr.stdout || 'gh pr create failed');
   }
   return pr.stdout.trim();
+}
+
+async function copyIntoRepo(source: string | undefined, repoRelPath: string): Promise<string | undefined> {
+  if (!source) {
+    return undefined;
+  }
+  try {
+    await fs.copyFile(source, path.join(projectRoot, repoRelPath));
+    return repoRelPath;
+  } catch {
+    return undefined;
+  }
+}
+
+function imageRef(
+  ownerRepo: { owner: string; repo: string } | undefined,
+  sha: string,
+  repoRelPath: string | undefined,
+  relativeFallback: string
+): string | undefined {
+  if (!repoRelPath) {
+    return undefined;
+  }
+  if (!ownerRepo) {
+    return relativeFallback;
+  }
+  const urlPath = repoRelPath.split(path.sep).join('/');
+  return `https://raw.githubusercontent.com/${ownerRepo.owner}/${ownerRepo.repo}/${sha}/${urlPath}`;
+}
+
+export function parseGithubOwnerRepo(remoteUrl: string): { owner: string; repo: string } | undefined {
+  const cleaned = remoteUrl.trim().replace(/\.git$/, '');
+  // Matches https://github.com/owner/repo and git@github.com:owner/repo
+  const match = cleaned.match(/github\.com[:/]([^/]+)\/([^/]+)$/);
+  if (!match) {
+    return undefined;
+  }
+  return { owner: match[1], repo: match[2] };
 }
 
 async function git(args: string[]) {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Diagnosis, RepairProposal, TestIntent } from '../../src/core/types.js';
-import { buildRepairPrContent } from '../../src/pr/createRepairPr.js';
+import { buildRepairPrContent, parseGithubOwnerRepo } from '../../src/pr/createRepairPr.js';
 
 const intent: TestIntent = {
   name: 'login flow',
@@ -53,25 +53,58 @@ describe('buildRepairPrContent', () => {
     expect(content.body).toContain('Welcome, Demo User');
   });
 
-  it('includes before/after image references only when screenshots are present', () => {
+  it('includes before/after image references only when refs are provided', () => {
     const without = buildRepairPrContent({ testPath: '/repo/login.spec.ts', proposal, diagnosis, intent });
     expect(without.body).not.toContain('![before]');
     expect(without.body).not.toContain('## Before / after');
 
-    const withShots = buildRepairPrContent({
+    const relative = buildRepairPrContent({
       testPath: '/repo/login.spec.ts',
       proposal,
       diagnosis,
       intent,
-      hasBeforeScreenshot: true,
-      hasAfterScreenshot: true
+      beforeImageRef: './before.png',
+      afterImageRef: './after.png'
     });
-    expect(withShots.body).toContain('![before](./before.png)');
-    expect(withShots.body).toContain('![after](./after.png)');
+    expect(relative.body).toContain('![before](./before.png)');
+    expect(relative.body).toContain('![after](./after.png)');
+  });
+
+  it('embeds absolute raw URLs when given as image refs', () => {
+    const raw = 'https://raw.githubusercontent.com/LupeHiguera/testpilot/abc123/.testpilot/pr/s/before.png';
+    const content = buildRepairPrContent({
+      testPath: '/repo/login.spec.ts',
+      proposal,
+      diagnosis,
+      intent,
+      beforeImageRef: raw
+    });
+    expect(content.body).toContain(`![before](${raw})`);
+    expect(content.body).not.toContain('![after]');
   });
 
   it('defaults the base branch to main', () => {
     const content = buildRepairPrContent({ testPath: '/repo/login.spec.ts', proposal, diagnosis, intent });
     expect(content.body).toContain('base branch `main`');
+  });
+});
+
+describe('parseGithubOwnerRepo', () => {
+  it('parses an https remote with a .git suffix', () => {
+    expect(parseGithubOwnerRepo('https://github.com/LupeHiguera/testpilot.git')).toEqual({
+      owner: 'LupeHiguera',
+      repo: 'testpilot'
+    });
+  });
+
+  it('parses an ssh remote', () => {
+    expect(parseGithubOwnerRepo('git@github.com:LupeHiguera/testpilot.git')).toEqual({
+      owner: 'LupeHiguera',
+      repo: 'testpilot'
+    });
+  });
+
+  it('returns undefined for a non-github remote', () => {
+    expect(parseGithubOwnerRepo('https://gitlab.com/foo/bar.git')).toBeUndefined();
   });
 });
