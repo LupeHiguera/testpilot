@@ -45,6 +45,21 @@ npm run testpilot -- demo --mode openai --model gpt-5.5
 
 Mock mode remains the deterministic default.
 
+## Vision-Assisted Diagnosis
+
+Pass `--vision` to `diagnose` or `repair` to refine the failure classification with
+a model's read of the failure screenshot:
+
+```bash
+npm run testpilot -- diagnose runs/<run>/run-result.json examples/login-spec.md --vision --mode openai
+```
+
+The deterministic heuristic classifier remains the floor. Vision is merged under a
+strict safety invariant: **it can veto a repair but never authorize one the
+heuristics did not already allow** — a result is repairable only when both the
+heuristic and the vision category agree it is safe drift. In mock mode the vision
+step concurs deterministically, so demos and CI stay reproducible.
+
 ## Repair Pull Requests
 
 When a safe repair is applied, testpilot assembles a reviewable PR bundle under the
@@ -77,5 +92,5 @@ CI runs the same checks plus the demo on every push/PR (`.github/workflows/ci.ym
 The MVP uses direct Playwright APIs for browser control. Future extension points include:
 
 - Playwright MCP as an optional browser-control backend for agent-tool demos.
-- Vision-assisted diagnosis for screenshot comparison and ambiguous UI analysis.
 - Pushing repair PRs automatically from CI with uploaded before/after artifacts (local bundle + `--open-pr` exist today).
+- Richer vision diagnosis: side-by-side expected-vs-actual screenshot comparison (single-screenshot classification exists today via `--vision`).

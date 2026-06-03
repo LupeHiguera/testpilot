@@ -56,6 +56,12 @@ export interface Diagnosis {
   repairable: boolean;
 }
 
+export interface VisionDiagnosis {
+  category: FailureCategory;
+  confidence: number;
+  reason: string;
+}
+
 export interface RepairProposal {
   category: FailureCategory;
   reason: string;
@@ -74,4 +80,9 @@ export interface ModelClient {
     diagnosis: Diagnosis;
     runResult: RunResult;
   }): Promise<RepairProposal>;
+  classifyScreenshot(input: {
+    screenshotPath: string;
+    intent: TestIntent;
+    heuristic: Diagnosis;
+  }): Promise<VisionDiagnosis>;
 }

@@ -1,5 +1,5 @@
 import { parseSpec } from '../spec/parseSpec.js';
-import { Diagnosis, ModelClient, ObservationArtifacts, RepairProposal, RunResult, TestIntent } from '../core/types.js';
+import { Diagnosis, ModelClient, ObservationArtifacts, RepairProposal, RunResult, TestIntent, VisionDiagnosis } from '../core/types.js';
 
 export class MockModelClient implements ModelClient {
   async parseSpec(spec: string): Promise<TestIntent> {
@@ -20,6 +20,19 @@ test('${intent.name}', async ({ page }) => {
   await expect(page.getByText('${intent.expectedText}')).toBeVisible();
 });
 `;
+  }
+
+  async classifyScreenshot(input: {
+    screenshotPath: string;
+    intent: TestIntent;
+    heuristic: Diagnosis;
+  }): Promise<VisionDiagnosis> {
+    // Deterministic: concur with the heuristic so mock runs stay reproducible.
+    return {
+      category: input.heuristic.category,
+      confidence: input.heuristic.confidence,
+      reason: 'Mock vision concurs with the heuristic classification.'
+    };
   }
 
   async proposeRepair(input: {

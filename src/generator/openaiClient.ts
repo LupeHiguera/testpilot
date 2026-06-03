@@ -1,6 +1,8 @@
+import fs from 'node:fs/promises';
 import OpenAI from 'openai';
 import { parseSpec } from '../spec/parseSpec.js';
-import { Diagnosis, ModelClient, ObservationArtifacts, RepairProposal, RunResult, TestIntent } from '../core/types.js';
+import { Diagnosis, FailureCategory, ModelClient, ObservationArtifacts, RepairProposal, RunResult, TestIntent, VisionDiagnosis } from '../core/types.js';
+import { FAILURE_CATEGORIES } from '../diagnosis/categories.js';
 import { MockModelClient } from './mockClient.js';
 
 export class OpenAiModelClient implements ModelClient {
@@ -114,6 +116,62 @@ export class OpenAiModelClient implements ModelClient {
       proposedContent,
       diff: createPatch(input.testPath, input.testContent, proposedContent),
       safeToApply: true
+    };
+  }
+
+  async classifyScreenshot(input: {
+    screenshotPath: string;
+    intent: TestIntent;
+    heuristic: Diagnosis;
+  }): Promise<VisionDiagnosis> {
+    if (!process.env.OPENAI_API_KEY) {
+      return this.fallback.classifyScreenshot(input);
+    }
+    const base64 = (await fs.readFile(input.screenshotPath)).toString('base64');
+    const response = await this.client.responses.create({
+      model: this.model,
+      input: [
+        {
+          role: 'system',
+          content:
+            'You classify why a browser test failed. Use the screenshot and context to choose exactly one failure category. Return JSON only.'
+        },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'input_text',
+              text: JSON.stringify({ intent: input.intent, heuristic: input.heuristic, categories: FAILURE_CATEGORIES })
+            },
+            { type: 'input_image', image_url: `data:image/png;base64,${base64}`, detail: 'auto' }
+          ]
+        }
+      ],
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'vision_diagnosis',
+          schema: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['category', 'confidence', 'reason'],
+            properties: {
+              category: { type: 'string', enum: FAILURE_CATEGORIES },
+              confidence: { type: 'number' },
+              reason: { type: 'string' }
+            }
+          }
+        }
+      }
+    });
+    const parsed = JSON.parse(response.output_text || '{}');
+    const category: FailureCategory = (FAILURE_CATEGORIES as string[]).includes(parsed.category)
+      ? (parsed.category as FailureCategory)
+      : 'UNKNOWN';
+    return {
+      category,
+      confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0.5,
+      reason: typeof parsed.reason === 'string' && parsed.reason ? parsed.reason : 'Vision model returned no reason.'
     };
   }
 }

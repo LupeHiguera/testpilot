@@ -6,7 +6,7 @@ import { Command } from 'commander';
 import { observePage } from '../browser/observePage.js';
 import { createRunDir, defaultBaseUrl, generatedTestsDir, projectRoot } from '../core/config.js';
 import { ModelMode } from '../core/types.js';
-import { classifyFailure } from '../diagnosis/classifyFailure.js';
+import { diagnoseFailure } from '../diagnosis/diagnoseFailure.js';
 import { generatePlaywrightTest } from '../generator/generatePlaywrightTest.js';
 import { createModelClient } from '../generator/modelClient.js';
 import { createRepairPr } from '../pr/createRepairPr.js';
@@ -63,12 +63,13 @@ program
   .argument('<run-result-json>')
   .argument('<spec-file>')
   .option('--mode <mode>', 'Model mode: mock or openai', 'mock')
+  .option('--vision', 'Refine the diagnosis with a vision read of the failure screenshot')
   .action(async (runResultJson, specFile, options) => {
     const client = createModelClient(options.mode as ModelMode);
     const spec = await fs.readFile(path.resolve(specFile), 'utf8');
     const intent = await client.parseSpec(spec);
     const runResult = JSON.parse(await fs.readFile(path.resolve(runResultJson), 'utf8'));
-    const diagnosis = await classifyFailure(runResult, intent);
+    const diagnosis = await diagnoseFailure(runResult, intent, client, { vision: Boolean(options.vision) });
     console.log(JSON.stringify(diagnosis, null, 2));
   });
 
@@ -81,12 +82,13 @@ program
   .option('--model <model>', 'OpenAI model')
   .option('--open-pr', 'Open a GitHub PR for the repair instead of only writing a local bundle')
   .option('--base-branch <branch>', 'Base branch for the PR', 'main')
+  .option('--vision', 'Refine the diagnosis with a vision read of the failure screenshot')
   .action(async (testFile, runResultJson, specFile, options) => {
     const client = createModelClient(options.mode as ModelMode, options.model);
     const spec = await fs.readFile(path.resolve(specFile), 'utf8');
     const intent = await client.parseSpec(spec);
     const runResult = JSON.parse(await fs.readFile(path.resolve(runResultJson), 'utf8'));
-    const diagnosis = await classifyFailure(runResult, intent);
+    const diagnosis = await diagnoseFailure(runResult, intent, client, { vision: Boolean(options.vision) });
     const proposal = await proposePatch(client, {
       testPath: path.resolve(testFile),
       diagnosis,
@@ -151,7 +153,7 @@ async function runDemo(mode: ModelMode, model: string | undefined, baseUrl: stri
 
   const normalRun = await runPlaywrightTest({ testPath, baseUrl, route: intent.route });
   const copyRun = await runPlaywrightTest({ testPath, baseUrl: withVariant(baseUrl, 'copy-change'), route: intent.route, variant: 'copy-change' });
-  const diagnosis = await classifyFailure(copyRun, intent);
+  const diagnosis = await diagnoseFailure(copyRun, intent, client, { vision: true });
   const proposal = await proposePatch(client, { testPath, diagnosis, runResult: copyRun });
   const validation = validatePatch(proposal, diagnosis);
   let repairApplied = false;
@@ -176,7 +178,7 @@ async function runDemo(mode: ModelMode, model: string | undefined, baseUrl: stri
   }
 
   const regressionRun = await runPlaywrightTest({ testPath, baseUrl: withVariant(baseUrl, 'regression'), route: intent.route, variant: 'regression' });
-  const regressionDiagnosis = await classifyFailure(regressionRun, intent);
+  const regressionDiagnosis = await diagnoseFailure(regressionRun, intent, client, { vision: true });
 
   const reportPath = await writeReport({
     runDir,
