@@ -9,7 +9,11 @@ import { diagnoseFailure } from '../diagnosis/diagnoseFailure.js';
 import { generatePlaywrightTest } from '../generator/generatePlaywrightTest.js';
 import { createModelClient } from '../generator/modelClient.js';
 import { runDemoWithServer } from '../pipeline/demo.js';
-import { withVariant } from '../pipeline/demoServer.js';
+import { startDemoServer, stopProcessTree, withVariant } from '../pipeline/demoServer.js';
+import { runStoryPipeline } from '../pipeline/story.js';
+import { getProject, listProjects, saveProject } from '../projects/store.js';
+import { Project } from '../projects/types.js';
+import { addStory } from '../stories/store.js';
 import { createRepairPr } from '../pr/createRepairPr.js';
 import { applyRepair } from '../repair/applyPatch.js';
 import { proposePatch } from '../repair/proposePatch.js';
@@ -135,6 +139,81 @@ program
       console.log(`Repair PR bundle ${result.prBundleDir}`);
     }
     console.log(`Demo report ${result.reportPath}`);
+  });
+
+const projectCmd = program.command('project').description('Manage connected projects');
+
+projectCmd
+  .command('list')
+  .action(async () => {
+    for (const project of await listProjects()) {
+      console.log(`${project.id}\t${project.name}\t${project.baseUrl}\t${project.repoPath}`);
+    }
+  });
+
+projectCmd
+  .command('add')
+  .argument('<id>')
+  .requiredOption('--name <name>', 'Display name')
+  .requiredOption('--repo <path>', 'Path to the connected repo')
+  .requiredOption('--base-url <url>', 'Where the app under test serves')
+  .option('--tests-dir <dir>', 'Test output dir (relative to repo)', 'tests')
+  .option('--docs-dir <dir>', 'Docs output dir (relative to repo)', 'docs')
+  .option('--route <route>', 'Default route to observe', '/login')
+  .option('--email <email>', 'Test login email')
+  .option('--password <password>', 'Test login password')
+  .option('--runnable', 'testpilot can run the generated tests here (shares its Playwright context)')
+  .action(async (id, options) => {
+    const project: Project = {
+      id,
+      name: options.name,
+      repoPath: path.resolve(options.repo),
+      baseUrl: options.baseUrl,
+      testsDir: options.testsDir,
+      docsDir: options.docsDir,
+      route: options.route,
+      credentials: options.email ? { email: options.email, password: options.password ?? '' } : undefined,
+      framework: 'playwright',
+      runnable: Boolean(options.runnable),
+      sources: [{ type: 'upload' }]
+    };
+    const file = await saveProject(project);
+    console.log(`Saved project ${id} → ${file}`);
+  });
+
+const specCmd = program.command('spec').description('Add and run testing stories');
+
+specCmd
+  .command('add')
+  .argument('<project-id>')
+  .argument('[file]')
+  .option('--text <text>', 'Story text (instead of a file)')
+  .option('--title <title>', 'Story title')
+  .option('--mode <mode>', 'Model mode: mock or openai', 'mock')
+  .option('--vision', 'Refine diagnosis with a vision read of the failure screenshot')
+  .action(async (projectId, file, options) => {
+    const project = await getProject(projectId);
+    if (!project) {
+      console.error(`Unknown project: ${projectId}`);
+      process.exitCode = 1;
+      return;
+    }
+    const body = options.text ?? (await fs.readFile(path.resolve(file), 'utf8'));
+    const title = options.title ?? (file ? path.basename(file) : body.trim().slice(0, 60));
+    const story = await addStory({ projectId, source: 'upload', title, body });
+    console.log(`Added story ${story.id} ("${title}") to ${projectId}`);
+
+    // testpilot manages the demo app; connected projects run their own dev server.
+    const server = project.id === 'demo' ? await startDemoServer() : undefined;
+    try {
+      const result = await runStoryPipeline(project, story, { mode: options.mode as ModelMode, vision: Boolean(options.vision) });
+      console.log(`Story ${result.status}`);
+      console.log(`Test ${result.testPath}`);
+    } finally {
+      if (server) {
+        stopProcessTree(server.pid);
+      }
+    }
   });
 
 program
