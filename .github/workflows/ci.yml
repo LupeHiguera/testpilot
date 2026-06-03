@@ -29,6 +29,9 @@ jobs:
       - name: Unit tests
         run: npm run test
 
+      - name: Build dashboard
+        run: npm run ui:build
+
       - name: Install Playwright Chromium
         run: npm run playwright:install -- --with-deps
 

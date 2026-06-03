@@ -94,6 +94,40 @@ npm run validate:demo  # validate, then run the full mock demo end-to-end
 
 CI runs the same checks plus the demo on every push/PR (`.github/workflows/ci.yml`).
 
+## Live View
+
+A Grand Canyon pixel-art dashboard streams a run stage-by-stage — each pipeline
+stage forms a "canyon stratum" that reveals its evidence (screenshot, diagnosis +
+reasoning, diff, verdict) as events arrive over Server-Sent Events.
+
+```bash
+npm run ui:build      # build the dashboard (ui/ -> ui/dist)
+npm run serve         # then open http://127.0.0.1:4000 and press "Run demo"
+```
+
+The server (`src/server`) exposes `GET /events` (SSE), `GET /api/runs`,
+`GET /artifacts/*` (sandboxed to `runs/`), and `POST /api/run`. The pipeline emits
+stage events through a process-local bus (`src/events`) that is a no-op for the
+plain CLI and gains the SSE sink only under `serve`. The dashboard is a standalone
+Vite/React app in `ui/`; `npm run ui:dev` runs it with a dev proxy to the server.
+
+## Graded UI Workflow
+
+The dashboard was built and held to a bar by a two-agent loop: a **coder** agent
+implements the UI, and a **grader** agent scores it against a fixed rubric using a
+real **MCP server** (`tools/grader-mcp/`) for objective evidence.
+
+- `capture_ui` — multi-viewport screenshots (returned inline so the grader's vision sees them)
+- `run_ui_checks` — axe-core accessibility violations, console errors, metrics
+- `record_grade` — appends per-criterion scores to `grading/grades.jsonl`
+- `rubric://testpilot-ui` — the 7-criterion rubric (design-system rigor, evidence
+  altitude, real-data fidelity, live-ness, accessibility, theme craft, engineering)
+
+The server is registered in `.mcp.json`; `tools/grader-mcp/harness.mjs` is the MCP
+client that drives a grading round. The rubric explicitly penalizes the "vibe-coded"
+look (generic gradients, emoji-as-UI, component-kit defaults, fake data) and a repair
+only counts as passing when every criterion scores ≥ 3.
+
 ## Roadmap
 
 The MVP uses direct Playwright APIs for browser control. Future extension points include:
