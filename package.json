@@ -9,6 +9,9 @@
   "scripts": {
     "testpilot": "tsx src/cli/index.ts",
     "demo:app": "vite --host 127.0.0.1",
+    "serve": "tsx src/cli/index.ts serve",
+    "ui:dev": "vite --config ui/vite.config.ts",
+    "ui:build": "vite build --config ui/vite.config.ts",
     "build": "tsc --noEmit",
     "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts",
