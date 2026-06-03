@@ -1,0 +1,415 @@
+/* ============================================================================
+   testpilot live view — desert / Grand Canyon design system
+   Constrained palette + spacing & type scales. No ad-hoc values.
+   ========================================================================== */
+:root {
+  /* Canyon strata palette (sunlit rim -> deep shadow) */
+  --strata-1: #f2c14e; /* sunlit sandstone */
+  --strata-2: #e0a96d; /* ochre */
+  --strata-3: #c8703f; /* terracotta */
+  --strata-4: #a04a35; /* rust */
+  --strata-5: #6e466b; /* shadow mauve */
+  --strata-6: #3c3357; /* deep indigo rock */
+
+  /* Surfaces */
+  --night: #241d33; /* canyon night background */
+  --night-2: #2e2745; /* raised panel */
+  --night-3: #392f52; /* hover / inset */
+  --rim: #4a3f63; /* hairline borders */
+
+  /* Ink */
+  --sand: #f4e4c9; /* primary text on dark */
+  --sand-dim: #c9b89c; /* secondary text */
+  --ink: #241d33; /* text on light chips */
+
+  /* Accents */
+  --turquoise: #2fa89a; /* Southwestern accent / pass */
+  --turquoise-deep: #1f7d72;
+  --sun: #f2c14e;
+  --canyon-red: #c0432f; /* fail */
+  --sky: #8fb9cc;
+
+  /* Spacing scale */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+  --s7: 48px;
+
+  /* Type scale */
+  --t-xs: 12px;
+  --t-sm: 13px;
+  --t-base: 15px;
+  --t-lg: 18px;
+  --t-xl: 23px;
+  --t-2xl: 32px;
+
+  --radius: 4px;
+  --border: 2px solid var(--rim);
+  --mono: 'JetBrains Mono', 'SFMono-Regular', 'Consolas', ui-monospace, monospace;
+  --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--sans);
+  font-size: var(--t-base);
+  line-height: 1.5;
+  color: var(--sand);
+  background:
+    linear-gradient(180deg, #2b2440 0%, var(--night) 45%, #1c1729 100%);
+  background-attachment: fixed;
+}
+
+img {
+  image-rendering: pixelated; /* crisp pixel-art rendering for sprites & shots */
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+code,
+pre {
+  font-family: var(--mono);
+}
+
+button {
+  font-family: var(--mono);
+  font-size: var(--t-sm);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: var(--sun);
+  border: 2px solid #b8892f;
+  border-radius: var(--radius);
+  padding: var(--s2) var(--s4);
+  cursor: pointer;
+  box-shadow: 0 2px 0 #8a6520;
+}
+button:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+button:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+button.secondary {
+  color: var(--sand);
+  background: var(--night-3);
+  border-color: var(--rim);
+  box-shadow: 0 2px 0 #1c1729;
+}
+
+/* ---- Layout ------------------------------------------------------------- */
+.app {
+  min-height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  padding: var(--s3) var(--s5);
+  border-bottom: var(--border);
+  background: linear-gradient(180deg, var(--night-2), var(--night));
+}
+.wordmark {
+  font-family: var(--mono);
+  font-size: var(--t-xl);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sand);
+}
+.wordmark b {
+  color: var(--sun);
+}
+.tagline {
+  color: var(--sand-dim);
+  font-size: var(--t-xs);
+  letter-spacing: 0.04em;
+}
+.topbar .spacer {
+  flex: 1;
+}
+
+.conn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sand-dim);
+}
+.dot {
+  width: 9px;
+  height: 9px;
+  border: 1px solid #00000044;
+}
+.dot.open {
+  background: var(--turquoise);
+  box-shadow: 0 0 8px var(--turquoise);
+}
+.dot.connecting {
+  background: var(--sun);
+}
+.dot.closed {
+  background: var(--canyon-red);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: var(--s5);
+  padding: var(--s5);
+  max-width: 1280px;
+  width: 100%;
+  margin: 0 auto;
+}
+@media (max-width: 880px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.panel {
+  background: var(--night-2);
+  border: var(--border);
+  border-radius: var(--radius);
+  padding: var(--s4);
+}
+.panel h2 {
+  font-size: var(--t-sm);
+  color: var(--sand-dim);
+  margin-bottom: var(--s3);
+}
+
+/* ---- Run history -------------------------------------------------------- */
+.runlist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+.runlist li button {
+  width: 100%;
+  text-align: left;
+  text-transform: none;
+  letter-spacing: 0;
+  font-family: var(--sans);
+  color: var(--sand);
+  background: var(--night-3);
+  border: 1px solid var(--rim);
+  box-shadow: none;
+  padding: var(--s2) var(--s3);
+}
+.runlist li button.active {
+  border-color: var(--turquoise);
+}
+.runlist .when {
+  display: block;
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  color: var(--sand-dim);
+}
+.runlist .chips {
+  display: flex;
+  gap: var(--s1);
+  margin-top: var(--s1);
+  flex-wrap: wrap;
+}
+
+/* ---- Canyon strata ------------------------------------------------------ */
+.canyon {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.strata {
+  position: relative;
+  border: 2px solid #00000033;
+  border-radius: var(--radius);
+  padding: var(--s3) var(--s4);
+  color: #1c1422;
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: center;
+  gap: var(--s3);
+  cursor: default;
+  overflow: hidden;
+}
+.strata.s-spec {
+  background: var(--strata-1);
+}
+.strata.s-observe {
+  background: var(--strata-2);
+}
+.strata.s-generate {
+  background: var(--strata-3);
+  color: var(--sand);
+}
+.strata.s-run {
+  background: var(--strata-4);
+  color: var(--sand);
+}
+.strata.s-diagnose {
+  background: var(--strata-5);
+  color: var(--sand);
+}
+.strata.s-repair {
+  background: var(--strata-3);
+  color: var(--sand);
+}
+.strata.s-pr {
+  background: var(--strata-2);
+}
+.strata.s-decision {
+  background: var(--strata-6);
+  color: var(--sand);
+}
+.strata.clickable {
+  cursor: pointer;
+}
+.strata.clickable:hover {
+  filter: brightness(1.05);
+}
+.strata .glyph {
+  font-family: var(--mono);
+  font-size: var(--t-lg);
+  text-align: center;
+}
+.strata .stage {
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.75;
+}
+.strata .label {
+  font-size: var(--t-base);
+}
+.strata .badge {
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px var(--s2);
+  border-radius: 2px;
+  border: 1px solid #00000033;
+}
+.badge.pass {
+  background: var(--turquoise);
+  color: #07221f;
+}
+.badge.fail {
+  background: var(--canyon-red);
+  color: #fff;
+}
+.badge.start {
+  background: var(--sun);
+  color: var(--ink);
+}
+.badge.info {
+  background: #ffffff44;
+  color: inherit;
+}
+.strata.active::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, #ffffff22, transparent);
+  animation: shimmer 1.2s linear infinite;
+}
+@keyframes shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* ---- Evidence ----------------------------------------------------------- */
+.evidence {
+  background: var(--night);
+  border: 1px solid var(--rim);
+  border-radius: var(--radius);
+  margin: 3px 0 var(--s2);
+  padding: var(--s4);
+  color: var(--sand);
+  display: grid;
+  gap: var(--s3);
+}
+.evidence h3 {
+  font-size: var(--t-sm);
+  color: var(--sand-dim);
+}
+.evidence img {
+  max-width: 100%;
+  border: 2px solid var(--rim);
+  border-radius: var(--radius);
+}
+.evidence pre {
+  margin: 0;
+  padding: var(--s3);
+  background: #160f20;
+  border: 1px solid var(--rim);
+  border-radius: var(--radius);
+  font-size: var(--t-xs);
+  overflow: auto;
+  max-height: 320px;
+}
+.evidence pre .add {
+  color: var(--turquoise);
+}
+.evidence pre .del {
+  color: #e0876f;
+}
+.reason {
+  color: var(--sand);
+  border-left: 3px solid var(--turquoise);
+  padding-left: var(--s3);
+}
+
+/* ---- Empty / hero ------------------------------------------------------- */
+.hero {
+  text-align: center;
+  padding: var(--s7) var(--s4);
+  color: var(--sand-dim);
+}
+.hero h2 {
+  color: var(--sand);
+  font-size: var(--t-xl);
+  margin-bottom: var(--s3);
+}
+.muted {
+  color: var(--sand-dim);
+  font-size: var(--t-sm);
+}
