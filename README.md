@@ -118,6 +118,8 @@ Toggle the topbar to **Docs** to browse the selected project's living documentat
 (each flow's instructions, derived steps, and test-backed status) and write it into
 the repo.
 
+![The Docs view — living documentation rendered from stories and their tests](docs/docs-view.png)
+
 The server (`src/server`) exposes `GET /events` (SSE), `GET /api/runs`,
 `GET /artifacts/*`, `GET /api/projects`, `GET /api/stories`, `GET /api/docs`, and
 `POST` endpoints to trigger runs, stories, and docs. For UI development,
