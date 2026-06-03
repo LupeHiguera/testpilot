@@ -5,6 +5,7 @@ ui/dist/
 .idea/
 runs/*
 !runs/.gitignore
+grading/
 tests/generated/*
 !tests/generated/.gitignore
 .claude/settings.local.json

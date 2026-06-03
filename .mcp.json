@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "testpilot-grader": {
+      "command": "node",
+      "args": ["--import", "tsx", "tools/grader-mcp/index.ts"]
+    }
+  }
+}
