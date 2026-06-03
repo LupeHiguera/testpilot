@@ -8,9 +8,11 @@ testpilot is a CLI-first agentic QA prototype. The current MVP includes:
 - A Vite React demo app with `/login` and `/dashboard`.
 - A TypeScript CLI for generating, running, diagnosing, and repairing Playwright tests.
 - Deterministic mock mode for local development and CI.
-- Optional OpenAI mode using `OPENAI_API_KEY`.
+- Optional OpenAI mode using `OPENAI_API_KEY` (verified end-to-end).
 - Failure classification for safe UI drift versus product regression.
+- Optional vision-assisted diagnosis (`--vision`) under a strict safety invariant.
 - Auto-application of safe repairs only inside `tests/generated/`.
+- Reviewable repair PR bundles, with optional one-command GitHub PRs (`--open-pr`).
 
 ## Install
 
@@ -38,12 +40,17 @@ npm run testpilot -- repair tests/generated/login.spec.ts runs/<run>/run-result.
 
 ## OpenAI Mode
 
+Set `OPENAI_API_KEY` (the same key powers `--vision`). Per session in PowerShell, or
+persist it with `setx OPENAI_API_KEY "..."` and restart the shell:
+
 ```bash
 $env:OPENAI_API_KEY = "..."
 npm run testpilot -- demo --mode openai --model gpt-5.5
 ```
 
-Mock mode remains the deterministic default.
+Mock mode remains the deterministic default; OpenAI mode is verified end-to-end
+(generation, repair, and vision diagnosis) and degrades gracefully back to mock
+behavior when a call fails.
 
 ## Vision-Assisted Diagnosis
 
