@@ -742,12 +742,6 @@ button.secondary {
   color: var(--sand-dim);
   margin-top: var(--s1);
 }
-.runlist .chips {
-  display: flex;
-  gap: var(--s1);
-  margin-top: var(--s2);
-  flex-wrap: wrap;
-}
 /* A COMPACT color-keyed verdict cue embossed into every past-run ledger row at
    rest — the same rust/teal/gold key as the bedrock verdict slab. At rest it is
    just the stamp mark + tone WORD (the verdict at a glance), so the Expeditions
