@@ -9,9 +9,7 @@ import { PipelineEventStatus, PipelineStage } from '../events/types.js';
 import { generatePlaywrightTest } from '../generator/generatePlaywrightTest.js';
 import { createModelClient } from '../generator/modelClient.js';
 import { createRepairPr } from '../pr/createRepairPr.js';
-import { applyRepair } from '../repair/applyPatch.js';
-import { proposePatch } from '../repair/proposePatch.js';
-import { validatePatch } from '../repair/validatePatch.js';
+import { runRepairLoop } from '../repair/repairLoop.js';
 import { writeReport } from '../reporting/writeReport.js';
 import { runPlaywrightTest } from '../runner/runPlaywrightTest.js';
 import { startDemoServer, stopProcessTree, withVariant } from './demoServer.js';
@@ -87,25 +85,30 @@ export async function runDemoPipeline({ mode, model, baseUrl }: DemoOptions): Pr
     });
 
     emit('diagnose', 'start', 'Diagnosing the copy-change failure', { scenario: 'copy-change' });
-    const diagnosis = await diagnoseFailure(copyRun, intent, client, { vision: true });
-    emit('diagnose', 'pass', `${diagnosis.category} (${diagnosis.confidence})`, { scenario: 'copy-change', diagnosis });
-
-    const proposal = await proposePatch(client, { testPath, diagnosis, runResult: copyRun });
-    const validation = validatePatch(proposal, diagnosis);
-    let repairApplied = false;
-    let repairedRun = copyRun;
+    // Tag every loop event with the copy-change scenario so the dashboard groups them.
+    const copyEmit = (stage: PipelineStage, status: PipelineEventStatus, label: string, data?: Record<string, unknown>) =>
+      emit(stage, status, label, { scenario: 'copy-change', ...data });
+    const copyRepair = await runRepairLoop({
+      testPath,
+      intent,
+      firstRun: copyRun,
+      client,
+      vision: true,
+      observe: () => observePage(withVariant(baseUrl, 'copy-change'), intent.route, createRunDir('demo-repair')),
+      runTest: () =>
+        runPlaywrightTest({ testPath, baseUrl: withVariant(baseUrl, 'copy-change'), route: intent.route, variant: 'copy-change' }),
+      emit: copyEmit,
+      beforeScreenshot: rel(copyRun.failureArtifacts?.screenshotPath),
+      relArtifact: rel
+    });
+    const diagnosis = copyRepair.diagnosis;
+    const proposal = copyRepair.proposal;
+    const repairApplied = copyRepair.repairApplied;
+    const copyRepairPassed = copyRepair.status === 'passing';
     let prBundleDir: string | undefined;
-    if (validation.valid) {
-      emit('repair', 'start', 'Applying a safe, intent-preserving repair', { scenario: 'copy-change' });
-      await applyRepair(proposal);
-      repairApplied = true;
-      repairedRun = await runPlaywrightTest({
-        testPath,
-        baseUrl: withVariant(baseUrl, 'copy-change'),
-        route: intent.route,
-        variant: 'copy-change'
-      });
-      const afterObservation = await observePage(withVariant(baseUrl, 'copy-change'), intent.route, createRunDir('demo-after'));
+    if (repairApplied && proposal) {
+      // Bundle the applied repair for human review, reusing the loop's last
+      // observation as the "after" screenshot (no extra browser launch).
       const pr = await createRepairPr({
         testPath,
         proposal,
@@ -113,20 +116,11 @@ export async function runDemoPipeline({ mode, model, baseUrl }: DemoOptions): Pr
         intent,
         runDir,
         beforeScreenshot: copyRun.failureArtifacts?.screenshotPath,
-        afterScreenshot: afterObservation.screenshotPath,
+        afterScreenshot: copyRepair.lastObservation?.screenshotPath,
         openPr: false
       });
       prBundleDir = pr.bundleDir;
-      emit('repair', repairedRun.passed ? 'pass' : 'fail', repairedRun.passed ? 'Repair applied — test passes' : 'Repair applied — still failing', {
-        scenario: 'copy-change',
-        diff: proposal.diff,
-        reason: proposal.reason,
-        beforeScreenshot: rel(copyRun.failureArtifacts?.screenshotPath),
-        afterScreenshot: rel(afterObservation.screenshotPath)
-      });
-      emit('pr', 'info', 'Repair PR bundle written', { bundleDir: rel(prBundleDir) });
-    } else {
-      emit('repair', 'info', `Repair refused: ${validation.reason}`, { scenario: 'copy-change' });
+      copyEmit('pr', 'info', 'Repair PR bundle written', { bundleDir: rel(prBundleDir) });
     }
 
     // Regression is an independent scenario: run the pristine test, not the repaired one.
@@ -154,7 +148,7 @@ export async function runDemoPipeline({ mode, model, baseUrl }: DemoOptions): Pr
       runDir,
       intent,
       observation,
-      runResult: repairedRun.passed ? regressionRun : copyRun,
+      runResult: copyRepairPassed ? regressionRun : copyRun,
       diagnosis: regressionDiagnosis.category === 'PRODUCT_REGRESSION' ? regressionDiagnosis : diagnosis,
       repair: proposal,
       repairApplied,
@@ -166,7 +160,7 @@ export async function runDemoPipeline({ mode, model, baseUrl }: DemoOptions): Pr
         },
         {
           name: 'Safe copy-change repair',
-          passed: repairedRun.passed,
+          passed: copyRepairPassed,
           diagnosis: diagnosis.category,
           repairApplied,
           note: 'Button text changed while the login behavior remained equivalent.'
@@ -184,7 +178,7 @@ export async function runDemoPipeline({ mode, model, baseUrl }: DemoOptions): Pr
     await fs.writeFile(
       path.join(runDir, 'demo-summary.json'),
       JSON.stringify(
-        { normalRun, copyRun, diagnosis, validation, repairApplied, repairedRun, regressionRun, regressionDiagnosis, prBundleDir },
+        { normalRun, copyRun, diagnosis, copyRepair, repairApplied, copyRepairPassed, regressionRun, regressionDiagnosis, prBundleDir },
         null,
         2
       ),

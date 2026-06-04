@@ -2,15 +2,12 @@ import path from 'node:path';
 import { observePage } from '../browser/observePage.js';
 import { createRunDir, projectRoot } from '../core/config.js';
 import { ModelMode } from '../core/types.js';
-import { diagnoseFailure } from '../diagnosis/diagnoseFailure.js';
 import { emitStage } from '../events/bus.js';
 import { PipelineEventStatus, PipelineStage } from '../events/types.js';
 import { generatePlaywrightTest } from '../generator/generatePlaywrightTest.js';
 import { createModelClient } from '../generator/modelClient.js';
 import { Project } from '../projects/types.js';
-import { applyRepair } from '../repair/applyPatch.js';
-import { proposePatch } from '../repair/proposePatch.js';
-import { validatePatch } from '../repair/validatePatch.js';
+import { runRepairLoop } from '../repair/repairLoop.js';
 import { writeReport } from '../reporting/writeReport.js';
 import { runPlaywrightTest } from '../runner/runPlaywrightTest.js';
 import { updateStory } from '../stories/store.js';
@@ -72,24 +69,27 @@ export async function runStoryPipeline(
     let status: StoryStatus = runResult.passed ? 'passing' : 'failing';
     if (!runResult.passed) {
       emit('diagnose', 'start', 'Diagnosing the failure');
-      const diagnosis = await diagnoseFailure(runResult, intent, client, { vision: opts.vision });
-      emit('diagnose', 'pass', `${diagnosis.category} (${diagnosis.confidence})`, { diagnosis });
-
-      const proposal = await proposePatch(client, { testPath, diagnosis, runResult });
-      const validation = validatePatch(proposal, diagnosis);
-      if (validation.valid) {
-        emit('repair', 'start', 'Applying a safe, intent-preserving repair');
-        await applyRepair(proposal);
-        const rerun = await runPlaywrightTest({ testPath, baseUrl: project.baseUrl, route: intent.route });
-        emit('repair', rerun.passed ? 'pass' : 'fail', rerun.passed ? 'Repair applied — test passes' : 'Repair applied — still failing', {
-          diff: proposal.diff
-        });
-        status = rerun.passed ? 'passing' : 'needs-review';
-      } else {
-        emit('repair', 'info', `Repair refused: ${validation.reason}`);
-        status = 'needs-review';
-      }
-      await writeReport({ runDir, intent, observation, runResult, diagnosis, repair: proposal, repairApplied: validation.valid });
+      const repair = await runRepairLoop({
+        testPath,
+        intent,
+        firstRun: runResult,
+        client,
+        vision: opts.vision,
+        observe: () => observePage(project.baseUrl, intent.route, createRunDir(`story-${story.id}-repair`)),
+        runTest: () => runPlaywrightTest({ testPath, baseUrl: project.baseUrl, route: intent.route }),
+        emit
+      });
+      status = repair.status;
+      await writeReport({
+        runDir,
+        intent,
+        observation,
+        runResult,
+        diagnosis: repair.diagnosis,
+        repair: repair.proposal,
+        repairApplied: repair.repairApplied,
+        attempts: repair.attempts.length
+      });
     } else {
       await writeReport({ runDir, intent, observation, runResult });
     }

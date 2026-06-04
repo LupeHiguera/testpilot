@@ -40,6 +40,9 @@ test('${intent.name}', async ({ page }) => {
     testContent: string;
     diagnosis: Diagnosis;
     runResult: RunResult;
+    // Accepted for contract parity; the mock stays deterministic and does not
+    // use the observation, so reproducible runs/CI are unaffected.
+    observation?: ObservationArtifacts;
   }): Promise<RepairProposal> {
     const repaired = input.testContent.replace(
       /await page\.getByRole\('button', \{ name: 'Sign in' \}\)\.click\(\);/,

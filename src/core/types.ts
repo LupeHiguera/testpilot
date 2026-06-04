@@ -79,6 +79,10 @@ export interface ModelClient {
     testContent: string;
     diagnosis: Diagnosis;
     runResult: RunResult;
+    // A fresh observation of the page at repair time, so the proposal can be
+    // grounded in the CURRENT UI rather than only the stale failure. Optional so
+    // the contract stays backward-compatible and mock mode can ignore it.
+    observation?: ObservationArtifacts;
   }): Promise<RepairProposal>;
   classifyScreenshot(input: {
     screenshotPath: string;

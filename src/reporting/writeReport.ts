@@ -10,6 +10,8 @@ export async function writeReport(input: {
   diagnosis?: Diagnosis;
   repair?: RepairProposal;
   repairApplied?: boolean;
+  /** How many repair attempts the re-observe loop made before settling. */
+  attempts?: number;
   scenarios?: Array<{
     name: string;
     passed: boolean;
@@ -51,6 +53,7 @@ export async function writeReport(input: {
     '## Repair',
     input.repair ? `Safe to apply: ${input.repair.safeToApply}` : 'No repair proposed.',
     input.repair ? `Applied: ${Boolean(input.repairApplied)}` : '',
+    input.attempts ? `Attempts: ${input.attempts}` : '',
     input.repair ? `Reason: ${input.repair.reason}` : '',
     input.repair?.diff ? '```diff' : '',
     input.repair?.diff ?? '',
