@@ -1,9 +1,9 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getDocs, getRun, listProjects, listRuns, listStories, triggerRun, uploadStory, writeDocs } from './api';
 import { useEventStream } from './useEventStream';
-import { PixelCanyon } from './PixelCanyon';
 import { CanyonSpine } from './CanyonSpine';
 import { PixelWordmark } from './PixelWordmark';
+import { CanyonAtmosphere, type SkyPhase } from './CanyonAtmosphere';
 import { StageSprite, StatusMark } from './PixelSprites';
 import type { DocsModel, PipelineEvent, Project, RunSummary, Stage, Status, Story, StoryStatus } from './types';
 
@@ -29,6 +29,10 @@ const STAGE_DEPTH: Record<Stage, string> = {
   pr: 'Ledge',
   decision: 'Bedrock'
 };
+
+// Full pipeline depth — used to scale the descent fraction (and thus the
+// time-of-day sky shift) against the whole canyon, not just rows streamed so far.
+const TOTAL_STAGES = 8;
 
 const CONNECTION_NOTE: Record<string, string> = {
   open: 'Live — streaming events',
@@ -296,6 +300,7 @@ interface VerdictView {
   headline: string;
   category?: string;
   note: string;
+  done: boolean; // true once the verdict is final (drives the sunset reveal)
 }
 
 /**
@@ -335,6 +340,7 @@ function verdictFromLive(events: PipelineEvent[]): VerdictView | null {
   const tone = failed ? 'error' : repairApplied ? 'repaired' : 'guarded';
   return {
     tone,
+    done,
     mark: failed ? 'fail' : repairApplied ? 'pass' : 'info',
     headline: failed
       ? 'Run failed'
@@ -356,6 +362,20 @@ function verdictFromLive(events: PipelineEvent[]): VerdictView | null {
   };
 }
 
+/**
+ * Map a resolved VerdictView to the atmospheric sky phase + whether the run is
+ * fully done. The signature "sun sets on the verdict" moment keys off this:
+ *  - error    -> smoky red sunset (a regression was caught)
+ *  - repaired -> teal-green dusk  (auto-repaired & guarded)
+ *  - guarded  -> golden sunset    (clean / no repair needed)
+ * `done` is true once the run carries no in-flight (start) row, i.e. the
+ * verdict is final rather than provisional.
+ */
+function verdictFor(view: VerdictView): { phase: SkyPhase; done: boolean } {
+  const phase: SkyPhase = view.tone === 'error' ? 'error' : view.tone === 'repaired' ? 'repaired' : 'pass';
+  return { phase, done: view.done };
+}
+
 /** Format a millisecond span as a compact elapsed clock (e.g. 0:04, 1:12). */
 function fmtElapsed(ms: number): string {
   const total = Math.max(0, Math.round(ms / 1000));
@@ -364,12 +384,83 @@ function fmtElapsed(ms: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+/**
+ * Live elapsed clock. While the run is in flight, re-render every second so the
+ * gauge ticks in real time from the first event's wall-clock timestamp; once it
+ * stops, lock to the final span. Ticks regardless of reduced-motion (a clock is
+ * information, not decoration).
+ */
+function useLiveElapsed(startTs: number, lastTs: number, running: boolean): string {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!running) return;
+    setNow(Date.now());
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [running]);
+  const span = running ? now - startTs : lastTs - startTs;
+  return fmtElapsed(span);
+}
+
+/**
+ * Clamp a 0..1 progress value so it only updates when it moves by more than ~2%
+ * (or hits the 0/1 extremes), avoiding micro-jitter / churn on fast streams.
+ */
+function useClampedProgress(raw: number): number {
+  const [value, setValue] = useState(raw);
+  useEffect(() => {
+    setValue((prev) => {
+      const settled = raw === 0 || raw === 1;
+      return settled || Math.abs(raw - prev) > 0.02 ? raw : prev;
+    });
+  }, [raw]);
+  return value;
+}
+
+/**
+ * A number that briefly pulses when its value increases — used so "LAYERS
+ * CARVED" gives a small tick of life each time a new stratum is carved. The
+ * pulse is a one-shot CSS animation re-triggered by toggling a data attribute.
+ */
+function PulseNum({ value, className }: { value: number; className?: string }) {
+  const prev = useRef(value);
+  const [pulse, setPulse] = useState(false);
+  useEffect(() => {
+    if (value > prev.current) {
+      setPulse(true);
+      const id = window.setTimeout(() => setPulse(false), 600);
+      prev.current = value;
+      return () => window.clearTimeout(id);
+    }
+    prev.current = value;
+  }, [value]);
+  return (
+    <span className={`${className ?? ''} ${pulse ? 'num-pulse' : ''}`.trim()}>{value}</span>
+  );
+}
+
 function LiveCanyon({ events, connection }: { events: PipelineEvent[]; connection: string }) {
+  // First-visit / no-events-yet: show the LIVING-SKY hero (with the static baked
+  // mesas + sun) so the very first impression is the alive canyon, not a flat
+  // pixel banner. The descent atmosphere is the through-line of the whole view.
   if (events.length === 0) {
-    return (
-      <div className="panel hero">
-        <PixelCanyon />
-        <div className="hero-copy">
+    return <CanyonHero connection={connection} />;
+  }
+  return <LiveCanyonRun events={events} connection={connection} />;
+}
+
+/**
+ * The empty / first-visit hero. Renders the living atmosphere (idle phase, with
+ * the baked static mesa silhouette + sun) as a full backdrop behind the
+ * call-to-action, so a screenshot of a fresh dashboard already shows a canyon.
+ */
+function CanyonHero({ connection }: { connection: string }) {
+  return (
+    <div className="canyon-pane">
+      <div className="canyon-shell hero-shell">
+        <CanyonAtmosphere progress={0} phase="idle" />
+        <CanyonHorizon running={false} done={false} phase="idle" />
+        <div className="hero-copy hero-copy-sky">
           <h2>Watch a run descend the canyon</h2>
           <p className="muted">
             Each pipeline stage carves a rock layer as it runs. Press <strong>Run demo</strong> to stream one live.
@@ -379,8 +470,11 @@ function LiveCanyon({ events, connection }: { events: PipelineEvent[]; connectio
           </p>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
+
+function LiveCanyonRun({ events, connection }: { events: PipelineEvent[]; connection: string }) {
   const degraded = connection !== 'open';
   const activeIndex = events[events.length - 1].status === 'start' ? events.length - 1 : -1;
   // The run "descends" to the deepest layer reached so far; the spine marker
@@ -388,8 +482,25 @@ function LiveCanyon({ events, connection }: { events: PipelineEvent[]; connectio
   const reached = events.length;
   const startTs = events[0].ts;
   const lastTs = events[events.length - 1].ts;
-  const elapsed = fmtElapsed(lastTs - startTs);
-  const running = activeIndex !== -1;
+
+  // Descent fraction drives the living sky (day -> dusk -> sunset) and the glow
+  // travelling down the spine. We measure against the full 8-stage pipeline so
+  // the time-of-day shift is meaningful even mid-run.
+  const verdict = verdictFromLive(events);
+  const done = verdict ? verdictFor(verdict).done : false;
+  const running = activeIndex !== -1 && !done;
+
+  // Live elapsed clock: while a run is in flight the clock TICKS in real time
+  // (1s interval, measured from the first event's wall-clock ts) instead of
+  // freezing at the last event's timestamp. Once the run finishes it locks to
+  // the final span. Keeps ticking under reduced-motion — it's a clock, not decor.
+  const elapsed = useLiveElapsed(startTs, lastTs, running);
+
+  // Clamp the descent fraction so it only moves on meaningful change (>~2%),
+  // avoiding micro-jitter / churn on fast event streams.
+  const rawProgress = done ? 1 : Math.min(1, reached / TOTAL_STAGES);
+  const progress = useClampedProgress(rawProgress);
+  const phase: SkyPhase = verdict ? verdictFor(verdict).phase : 'running';
 
   return (
     <div className={`canyon-pane ${degraded ? 'degraded' : ''}`}>
@@ -398,9 +509,12 @@ function LiveCanyon({ events, connection }: { events: PipelineEvent[]; connectio
           <span className={`dot ${connection}`} aria-hidden /> {CONNECTION_NOTE[connection] ?? connection}
         </div>
       )}
-      <div className="canyon-grid">
+      <div className={`canyon-shell ${done ? 'run-complete' : ''}`}>
+        <CanyonAtmosphere progress={progress} phase={phase} />
+        <CanyonHorizon running={running} done={done} phase={phase} />
+        <div className="canyon-grid">
         <div className="canyon-spine-col" aria-hidden>
-          <CanyonSpine total={reached} reached={reached} rows={Math.max(24, reached * 3)} />
+          <CanyonSpine total={reached} reached={reached} rows={Math.max(24, reached * 3)} active={running} />
         </div>
         <div className="canyon-main">
           <div className="canyon">
@@ -408,16 +522,18 @@ function LiveCanyon({ events, connection }: { events: PipelineEvent[]; connectio
               <Strata key={event.id} event={event} active={index === activeIndex} />
             ))}
           </div>
-          <VerdictBanner view={verdictFromLive(events)} />
-          <div className="river-floor" aria-hidden />
+          <VerdictBanner view={verdict} />
+          <div className="river-floor" aria-hidden>
+            <span className="river-shimmer" />
+          </div>
         </div>
         <aside className="depth-gauge" aria-label="Run depth and elapsed time">
           <div className="gauge-block">
-            <span className="gauge-num">{reached}</span>
+            <PulseNum value={reached} className="gauge-num" />
             <span className="gauge-lab">layers carved</span>
           </div>
           <div className="gauge-block">
-            <span className="gauge-num">{elapsed}</span>
+            <span className="gauge-num" aria-live="polite">{elapsed}</span>
             <span className="gauge-lab">elapsed</span>
           </div>
           <div className={`gauge-status ${running ? 'is-live' : ''}`}>
@@ -425,7 +541,32 @@ function LiveCanyon({ events, connection }: { events: PipelineEvent[]; connectio
             {running ? 'descending' : 'at rest'}
           </div>
         </aside>
+        </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * The horizon header: a sky window above the strata where the living atmosphere
+ * (sun, clouds, bird, mesas) is fully visible — the canyon rim the run descends
+ * from. It carries a small instrument-style readout so the band stays useful,
+ * not purely decorative, and announces the signature "sun sets" verdict beat.
+ */
+function CanyonHorizon({ running, done, phase }: { running: boolean; done: boolean; phase: SkyPhase }) {
+  const label = done
+    ? phase === 'error'
+      ? 'Sundown · regression caught'
+      : phase === 'repaired'
+        ? 'Sundown · repaired & guarded'
+        : 'Sundown · run complete'
+    : running
+      ? 'Descending the canyon…'
+      : 'Canyon rim';
+  return (
+    <div className="canyon-horizon" aria-hidden>
+      <span className="horizon-rule" />
+      <span className={`horizon-label ${done ? 'is-done' : ''}`}>{label}</span>
     </div>
   );
 }
@@ -664,7 +805,8 @@ function verdictFromReport(report: PastReport): VerdictView | null {
       mark: 'fail',
       headline: 'Regression caught',
       category,
-      note: 'A real product regression was detected; the test was not weakened.'
+      note: 'A real product regression was detected; the test was not weakened.',
+      done: true
     };
   }
   if (repaired) {
@@ -675,7 +817,8 @@ function verdictFromReport(report: PastReport): VerdictView | null {
       category,
       note: regression
         ? 'Copy-change auto-repaired; the genuine regression was refused.'
-        : 'Safe copy-change auto-repaired.'
+        : 'Safe copy-change auto-repaired.',
+      done: true
     };
   }
   return {
@@ -683,7 +826,8 @@ function verdictFromReport(report: PastReport): VerdictView | null {
     mark: 'info',
     headline: 'Run complete',
     category,
-    note: report.repair?.reason ?? 'No repair was required.'
+    note: report.repair?.reason ?? 'No repair was required.',
+    done: true
   };
 }
 
@@ -718,15 +862,20 @@ function PastRun({ runId }: { runId: string }) {
   const title = runId.replace(/^demo-/, '').replace(/T/, ' ').replace(/-\d+Z$/, '');
 
   const depth = scenarios.length;
+  const pastVerdict = verdictFromReport(report);
+  const phase: SkyPhase = pastVerdict ? verdictFor(pastVerdict).phase : 'idle';
   return (
     <div className="canyon-pane">
       <div className="past-head">
         <h2 className="past-title">{title}</h2>
         {report.intent?.name && <span className="past-spec">{report.intent.name}</span>}
       </div>
-      <div className="canyon-grid">
+      <div className="canyon-shell run-complete">
+        <CanyonAtmosphere progress={1} phase={phase} />
+        <CanyonHorizon running={false} done phase={phase} />
+        <div className="canyon-grid">
         <div className="canyon-spine-col" aria-hidden>
-          <CanyonSpine total={depth} reached={depth} rows={Math.max(24, depth * 3)} />
+          <CanyonSpine total={depth} reached={depth} rows={Math.max(24, depth * 3)} active={false} />
         </div>
         <div className="canyon-main">
           <div className="canyon">
@@ -735,13 +884,15 @@ function PastRun({ runId }: { runId: string }) {
               <ScenarioStrata key={scenario.name} scenario={scenario} />
             ))}
           </div>
-          <VerdictBanner view={verdictFromReport(report)} />
+          <VerdictBanner view={pastVerdict} />
           {report.diagnosis && report.diagnosis.category !== 'UNKNOWN' && (
             <div className="evidence">
               <DiagnosisCard diagnosis={report.diagnosis} />
             </div>
           )}
-          <div className="river-floor" aria-hidden />
+          <div className="river-floor" aria-hidden>
+            <span className="river-shimmer" />
+          </div>
         </div>
         <aside className="depth-gauge" aria-label="Run depth">
           <div className="gauge-block">
@@ -753,6 +904,7 @@ function PastRun({ runId }: { runId: string }) {
             archived
           </div>
         </aside>
+        </div>
       </div>
     </div>
   );

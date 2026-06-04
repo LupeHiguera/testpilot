@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react';
+import type { CSSProperties, ReactElement } from 'react';
 
 /**
  * The CanyonSpine is the structural backbone of the POPULATED run view: a
@@ -35,11 +35,13 @@ const SUN_CORE = '#fff0c2';
 export function CanyonSpine({
   total,
   reached,
-  rows = 24
+  rows = 24,
+  active = false
 }: {
   total: number;
   reached: number;
   rows?: number;
+  active?: boolean;
 }): ReactElement {
   const ROWS = Math.max(rows, total * 3);
   const rects: ReactElement[] = [];
@@ -110,16 +112,31 @@ export function CanyonSpine({
     });
   }
 
+  // Depth fraction the descent has reached (0 at rim, 1 at floor). The glow trail
+  // and the travelling "ember" both read off this via a CSS custom property so
+  // they line up with the SVG sun marker without re-plotting rects every tick.
+  const frac = total > 0 ? Math.min(1, reached / total) : 0;
+
   return (
-    <svg
-      className="canyon-spine"
-      viewBox={`0 0 ${COLS * U} ${ROWS * U}`}
-      role="img"
-      aria-label={`Canyon depth gauge: descended ${reached} of ${total} rock layers`}
-      preserveAspectRatio="none"
-      shapeRendering="crispEdges"
+    <div
+      className={`spine-stack ${active ? 'is-active' : ''}`}
+      style={{ '--descent': frac } as CSSProperties}
     >
-      {rects}
-    </svg>
+      <svg
+        className="canyon-spine"
+        viewBox={`0 0 ${COLS * U} ${ROWS * U}`}
+        role="img"
+        aria-label={`Canyon depth gauge: descended ${reached} of ${total} rock layers`}
+        preserveAspectRatio="none"
+        shapeRendering="crispEdges"
+      >
+        {rects}
+      </svg>
+      {/* A glow that pours DOWN the cliff to the depth reached so far — the run's
+          "trail of fire/water" travelling through the layers. A brighter ember
+          rides the leading edge while the run is live. Purely decorative. */}
+      <div className="spine-trail" aria-hidden />
+      <div className="spine-ember" aria-hidden />
+    </div>
   );
 }
