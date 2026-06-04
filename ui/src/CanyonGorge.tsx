@@ -2,25 +2,26 @@ import type { ReactElement } from 'react';
 
 /**
  * CanyonGorge — the full-viewport, FIXED backdrop that puts the whole app INSIDE
- * a Grand Canyon gorge. It is pure SVG/CSS, lives behind all content (z-index
- * below the app), and is purely decorative (aria-hidden), so legibility never
- * depends on it.
+ * a dramatic Grand Canyon gorge. It is pure SVG/CSS, lives behind all content
+ * (z-index below the app), and is purely decorative (aria-hidden), so legibility
+ * never depends on it.
  *
  * Composition, back-to-front:
- *   - a sky strip across the top (the canyon RIM opening),
- *   - a far horizon band of distant mesas/buttes (palest, hazy parallax),
- *   - TWO towering layered canyon WALLS rising on the far left + right edges of
- *     the viewport, carved with polychrome strata, ledges, hoodoos, a natural
- *     ARCH, buttes, balanced boulders and sparse juniper — framing the centered
- *     app content like the canyon floor between them,
- *   - a dramatic flowing RIVER along the very floor (animated current, ripple
- *     sparkle, foam, sky reflection) — the showpiece.
+ *   - a sky strip across the top (the canyon RIM opening) with drifting clouds,
+ *   - a RECEDING far wall on each side (palest, hazy — parallax depth),
+ *   - a FOREGROUND towering canyon WALL on each edge whose TOP silhouettes
+ *     boldly against the sky: tapered HOODOO SPIRES, a natural ARCH you can see
+ *     sky through, a BALANCED ROCK, and varied BUTTES / MESAS of different
+ *     heights — an eroded, unmistakable canyon skyline, not a flat column,
+ *   - a dramatic flowing RIVER at the canyon FLOOR (banks/shoreline, animated
+ *     current, ripple sparkle, foam, a WATERFALL + RAPIDS, sky reflection) — the
+ *     showpiece the walls descend to.
  *
- * The walls are drawn once each (left + a mirrored right) as efficient SVG with
- * gradients and a modest number of polygons — no thousands of DOM nodes. All
- * motion (clouds, river current, sparkle, shimmer) is gated by
- * prefers-reduced-motion in CSS; the static gorge walls, formations and river
- * body remain so a still frame still reads unmistakably as a canyon.
+ * Each wall is drawn once (left + a mirrored right) as efficient shaped SVG
+ * paths + gradients — no thousands of DOM nodes. All motion (clouds, current,
+ * sparkle, foam, waterfall) is gated by prefers-reduced-motion in CSS; the
+ * static walls, formations and river body remain so a still frame still reads
+ * unmistakably as a canyon.
  */
 export function CanyonGorge(): ReactElement {
   return (
@@ -36,7 +37,8 @@ export function CanyonGorge(): ReactElement {
         <GorgeHorizon />
       </div>
 
-      {/* The two towering walls. Right is the left, mirrored. */}
+      {/* The two towering walls. Right is the left, mirrored. Each holds a hazy
+          RECEDING wall behind a darker FOREGROUND wall for canyon depth. */}
       <div className="gorge-wall gorge-wall-left">
         <CanyonWall side="left" />
       </div>
@@ -71,166 +73,283 @@ function GorgeHorizon(): ReactElement {
 }
 
 /**
- * One canyon wall — a tall vertical SVG of layered polychrome rock receding into
- * the gorge, carved with strata bands, ledges, a natural arch, hoodoos (totem
- * spires), a butte cap, balanced boulders and sparse juniper. The same drawing
- * serves both edges; the right wall is mirrored in CSS (scaleX(-1)).
+ * One canyon wall — a tall vertical SVG of layered polychrome rock whose TOP is a
+ * dramatic eroded SKYLINE silhouetting against the sky, and whose body descends
+ * to the canyon floor. The OUTER edge (x=0) is the cliff face the content sits
+ * against; the INNER edge (x≈340) is the gorge opening.
  *
- * viewBox is 220 wide x 1000 tall; the OUTER edge (x=0) is the cliff face the
- * content sits against, the INNER edge (x=220) is where the wall meets sky/floor
- * — drawn with a jagged silhouette so the gorge opening looks carved, not boxed.
+ * viewBox is 360 wide x 1000 tall, drawn full-bleed (meet → the skyline sits at
+ * the top of the viewport, the body fills down). The same drawing serves both
+ * edges; the right wall is mirrored in CSS (scaleX(-1)).
+ *
+ * Named formations along the skyline (outer→inner):
+ *   - THE GUARDIAN MESA: a tall flat-topped caprock block at the outer edge,
+ *   - THE SENTINEL SPIRES: a cluster of tapered hoodoo spires of varied height,
+ *   - SKYBRIDGE ARCH: a natural arch with a real sky-through opening,
+ *   - BALANCED ROCK: a boulder perched on a slender neck,
+ *   - THE STEP BUTTES: a descending run of mesas stepping into the gorge.
  */
 function CanyonWall({ side }: { side: 'left' | 'right' }): ReactElement {
-  const g = (n: string) => `${side}-${n}`; // unique gradient ids per side
+  const g = (n: string) => `${side}-${n}`; // unique gradient/filter ids per side
   return (
     <svg
       className="canyon-wall-svg"
-      viewBox="0 0 220 1000"
-      preserveAspectRatio="xMidYMid slice"
+      viewBox="0 0 360 1000"
+      preserveAspectRatio="xMinYMin slice"
       shapeRendering="geometricPrecision"
       aria-hidden
     >
       <defs>
-        {/* Polychrome rim->bedrock vertical strata gradient. */}
+        {/* Polychrome rim->bedrock vertical strata gradient (foreground wall). */}
         <linearGradient id={g('rock')} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#e9d8b4" />
-          <stop offset="12%" stopColor="#e6c281" />
-          <stop offset="26%" stopColor="#e0a96d" />
-          <stop offset="42%" stopColor="#cf6b3f" />
-          <stop offset="58%" stopColor="#b9502f" />
-          <stop offset="72%" stopColor="#a8432c" />
-          <stop offset="86%" stopColor="#7c3a2e" />
-          <stop offset="100%" stopColor="#5e3330" />
+          <stop offset="0%" stopColor="#eadbb8" />
+          <stop offset="10%" stopColor="#e6c281" />
+          <stop offset="22%" stopColor="#e0a96d" />
+          <stop offset="38%" stopColor="#cf6b3f" />
+          <stop offset="54%" stopColor="#b9502f" />
+          <stop offset="68%" stopColor="#a8432c" />
+          <stop offset="82%" stopColor="#7c3a2e" />
+          <stop offset="100%" stopColor="#562f2c" />
+        </linearGradient>
+        {/* The RECEDING far wall — same sequence, hazed toward the sky blue so it
+            reads as atmospheric distance behind the foreground wall. */}
+        <linearGradient id={g('rock-far')} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#d8b48a" />
+          <stop offset="24%" stopColor="#cf9a6c" />
+          <stop offset="52%" stopColor="#b97554" />
+          <stop offset="78%" stopColor="#8f5a48" />
+          <stop offset="100%" stopColor="#6b4942" />
         </linearGradient>
         {/* Shading from the lit outer face into the shadowed inner gorge. */}
         <linearGradient id={g('shade')} x1="0" y1="0" x2="1" y2="0">
           <stop offset="0%" stopColor="rgba(0,0,0,0)" />
-          <stop offset="62%" stopColor="rgba(0,0,0,0)" />
-          <stop offset="100%" stopColor="rgba(8,10,14,0.62)" />
+          <stop offset="58%" stopColor="rgba(0,0,0,0)" />
+          <stop offset="100%" stopColor="rgba(8,10,14,0.66)" />
         </linearGradient>
-        {/* A subtler dark for inset shadow pockets. */}
+        {/* Haze over the far wall (distance wash toward sky). */}
+        <linearGradient id={g('haze')} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="rgba(188,217,230,0.5)" />
+          <stop offset="40%" stopColor="rgba(188,217,230,0.18)" />
+          <stop offset="100%" stopColor="rgba(188,217,230,0)" />
+        </linearGradient>
         <linearGradient id={g('pocket')} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="rgba(0,0,0,0.42)" />
           <stop offset="100%" stopColor="rgba(0,0,0,0.05)" />
         </linearGradient>
       </defs>
 
-      {/* Wall body: outer edge straight (x=0), inner edge a jagged carved profile. */}
-      <polygon
-        className="wall-body"
-        fill={`url(#${g('rock')})`}
-        points={
-          '0,0 0,1000 196,1000 188,940 200,892 176,840 196,792 170,742 192,690 ' +
-          '168,632 196,576 172,520 200,470 174,414 198,360 170,300 200,244 ' +
-          '176,188 202,128 178,66 200,0'
+      {/* ---- RECEDING far wall: a paler, simpler eroded ridge set BEHIND and a
+          little inward of the foreground wall, so the gorge reads with depth
+          (foreground darker, distance hazier). Its own jagged skyline pokes up
+          between the foreground formations. */}
+      <path
+        className="wall-far-body"
+        fill={`url(#${g('rock-far')})`}
+        d={
+          'M0,150 L26,150 L40,108 L70,150 L96,96 L120,150 L150,120 L182,168 ' +
+          'L214,132 L250,182 L286,150 L322,196 L360,168 L360,1000 L0,1000 Z'
+        }
+      />
+      <path
+        className="wall-far-haze"
+        fill={`url(#${g('haze')})`}
+        d={
+          'M0,150 L26,150 L40,108 L70,150 L96,96 L120,150 L150,120 L182,168 ' +
+          'L214,132 L250,182 L286,150 L322,196 L360,168 L360,1000 L0,1000 Z'
         }
       />
 
-      {/* Horizontal strata bands — thin darker rules that read as rock layers. */}
-      <g className="wall-strata">
+      {/* ---- FOREGROUND wall body: the OUTER edge is straight (x=0); the TOP is
+          a dramatic carved SKYLINE; the INNER edge descends in eroded steps to
+          the floor. Everything above the skyline path is open sky. */}
+      <path
+        className="wall-body"
+        fill={`url(#${g('rock')})`}
+        d={WALL_PATH}
+      />
+
+      {/* Horizontal strata bands — thin darker rules that read as rock layers,
+          clipped to the wall body so they never spill into the sky. */}
+      <clipPath id={g('clip')}>
+        <path d={WALL_PATH} />
+      </clipPath>
+      <g className="wall-strata" clipPath={`url(#${g('clip')})`}>
         {STRATA_Y.map((y, i) => (
-          <rect key={i} x="0" y={y} width="206" height="3" />
+          <rect key={i} x="0" y={y} width="360" height="4" />
         ))}
       </g>
 
-      {/* Ledges: chunky stepped shelves jutting from the wall, lit on top. */}
-      <g className="wall-ledges">
-        <polygon points="0,470 96,470 110,486 0,486" />
-        <polygon points="0,690 74,690 86,704 0,704" />
-        <polygon points="0,250 60,250 70,264 0,264" />
-        <polygon points="0,872 120,872 132,890 0,890" />
-      </g>
-      {/* Lit highlight along the ledge tops. */}
-      <g className="wall-ledge-lip">
-        <rect x="0" y="468" width="96" height="2" />
-        <rect x="0" y="688" width="74" height="2" />
-        <rect x="0" y="248" width="60" height="2" />
-        <rect x="0" y="870" width="120" height="2" />
+      {/* Group everything that decorates the FOREGROUND wall, clipped to it. */}
+      <g clipPath={`url(#${g('clip')})`}>
+        {/* Ledges: chunky stepped shelves jutting from the wall, lit on top. */}
+        <g className="wall-ledges">
+          <polygon points="0,560 150,560 172,580 0,580" />
+          <polygon points="0,760 120,760 138,778 0,778" />
+          <polygon points="0,360 96,360 110,376 0,376" />
+          <polygon points="0,872 188,872 206,892 0,892" />
+        </g>
+        <g className="wall-ledge-lip">
+          <rect x="0" y="557" width="150" height="3" />
+          <rect x="0" y="757" width="120" height="3" />
+          <rect x="0" y="357" width="96" height="3" />
+          <rect x="0" y="869" width="188" height="3" />
+        </g>
+
+        {/* Vertical erosion runnels carved down the face — long shadow grooves. */}
+        <g className="wall-runnels">
+          <rect x="70" y="220" width="4" height="640" />
+          <rect x="128" y="300" width="3" height="560" />
+          <rect x="210" y="260" width="4" height="600" />
+          <rect x="276" y="340" width="3" height="520" />
+        </g>
+
+        {/* Balanced boulders perched on the lower ledges. */}
+        <g className="wall-boulders">
+          <ellipse className="boulder" cx="64" cy="772" rx="16" ry="13" />
+          <ellipse className="boulder-sm" cx="150" cy="884" rx="11" ry="9" />
+        </g>
+
+        {/* Sparse juniper / sage clinging to ledges (used sparingly). */}
+        <g className="wall-juniper">
+          <circle cx="120" cy="560" r="7" />
+          <circle cx="130" cy="565" r="5" />
+          <circle cx="96" cy="760" r="6" />
+          <circle cx="170" cy="872" r="7" />
+        </g>
+
+        {/* Inner-gorge shadow wash so the wall reads 3D / receding. */}
+        <rect x="0" y="0" width="360" height="1000" fill={`url(#${g('shade')})`} />
       </g>
 
-      {/* A natural ARCH high on the wall — two piers and a spanning lintel with a
-          dark void beneath. An iconic Grand Canyon formation. */}
+      {/* ---- SKYLINE FORMATIONS — drawn AFTER the body, NOT clipped, so their
+          silhouettes rise crisply against the open sky above the wall. ---- */}
+
+      {/* THE GUARDIAN MESA — a tall flat-topped caprock block at the outer edge,
+          with a lit cap rim and a darker base. The tallest skyline element. */}
+      <g className="wall-mesa">
+        <polygon className="mesa-body" points="18,70 96,70 96,300 0,300 0,108" />
+        <rect className="mesa-cap" x="12" y="62" width="90" height="10" />
+        <rect className="mesa-shadow" x="80" y="70" width="16" height="230" />
+      </g>
+
+      {/* THE SENTINEL SPIRES — a cluster of stout tapered HOODOO spires of varied
+          height standing ON the saddle ledge, the signature canyon silhouette.
+          Each is a chunky tapered column under a bulbous mushroom cap; they sit
+          on the ledge (bottoms ~y=300) rather than running the whole face. */}
+      <g className="wall-spires">
+        {/* tall central hoodoo — bulbous cap on a tapered stem, a waist band */}
+        <polygon className="spire" points="118,150 138,150 134,304 122,304" />
+        <ellipse className="spire-cap" cx="128" cy="146" rx="17" ry="10" />
+        <ellipse className="spire-cap2" cx="128" cy="220" rx="13" ry="7" />
+        {/* shorter hoodoo */}
+        <polygon className="spire" points="148,196 164,196 161,304 151,304" />
+        <ellipse className="spire-cap" cx="156" cy="192" rx="13" ry="8" />
+        {/* stubby hoodoo */}
+        <polygon className="spire" points="98,228 110,228 108,304 100,304" />
+        <ellipse className="spire-cap" cx="104" cy="224" rx="10" ry="6" />
+      </g>
+
+      {/* SKYBRIDGE ARCH — a natural arch with a REAL sky-through opening (the void
+          is the page sky showing through, not paint). Two thick piers carry a
+          spanning lintel; the wide gap beneath shows sky. Sits in the outer band
+          so it stays visible beside the centered content. */}
       <g className="wall-arch">
-        {/* solid mass the arch is cut from */}
         <path
           className="arch-mass"
-          d="M120,150 L186,150 L186,250 L120,250 Z"
+          d="M176,120 L228,120 L228,300 L212,300 L212,210
+             Q202,184 192,210 L192,300 L176,300 Z"
         />
-        {/* the void under the span (transparent cut shown as shadow) */}
+        {/* lit rim catching light along the top of the span */}
+        <rect className="arch-rim" x="176" y="120" width="52" height="11" />
+        {/* soft inner shadow lining the underside of the span opening */}
         <path
-          className="arch-void"
-          d="M132,250 L132,196 Q153,166 174,196 L174,250 Z"
+          className="arch-inner"
+          d="M180,210 Q202,176 224,210 L224,222 Q202,190 180,222 Z"
         />
-        {/* lit rim along the top of the span */}
-        <path className="arch-rim" d="M120,150 L186,150 L186,158 L120,158 Z" />
       </g>
 
-      {/* Hoodoos — mushroom/totem spires standing off a ledge. A few slim columns
-          with bulbous caps, the signature Bryce/Canyon formation. */}
-      <g className="wall-hoodoos">
-        {/* tall hoodoo */}
-        <rect className="hoodoo-stem" x="150" y="486" width="9" height="120" />
-        <rect className="hoodoo-cap" x="146" y="478" width="17" height="12" />
-        <rect className="hoodoo-cap2" x="148" y="528" width="13" height="8" />
-        {/* shorter hoodoo */}
-        <rect className="hoodoo-stem" x="172" y="520" width="7" height="86" />
-        <rect className="hoodoo-cap" x="168" y="514" width="15" height="10" />
-        {/* stubby hoodoo */}
-        <rect className="hoodoo-stem" x="134" y="552" width="6" height="54" />
-        <rect className="hoodoo-cap" x="131" y="546" width="12" height="9" />
+      {/* BALANCED ROCK — a wide boulder perched on a slender eroded neck, set on
+          the inner shoulder so it stands clear against the sky. */}
+      <g className="wall-balanced">
+        <rect className="balanced-neck" x="256" y="170" width="14" height="64" />
+        <ellipse className="balanced-cap" cx="263" cy="158" rx="30" ry="20" />
+        <ellipse className="balanced-shadow" cx="270" cy="162" rx="22" ry="13" />
       </g>
 
-      {/* A butte cap near the rim — a flat-topped block standing proud. */}
-      <g className="wall-butte">
-        <polygon className="butte-body" points="150,40 196,40 196,150 142,150 142,72" />
-        <rect className="butte-cap" x="142" y="40" width="54" height="6" />
+      {/* THE STEP BUTTES — a descending run of mesas stepping inward toward the
+          gorge floor, giving the inner skyline a layered, eroded read. */}
+      <g className="wall-stepbuttes">
+        <polygon className="butte-body" points="300,250 360,250 360,420 290,420 290,290" />
+        <rect className="butte-cap" x="290" y="246" width="70" height="6" />
+        <polygon className="butte-body" points="320,330 360,330 360,470 312,470 312,360" />
+        <rect className="butte-cap" x="312" y="326" width="48" height="5" />
       </g>
-
-      {/* Balanced boulders perched on the lower ledge. */}
-      <g className="wall-boulders">
-        <ellipse className="boulder" cx="58" cy="700" rx="13" ry="11" />
-        <ellipse className="boulder-sm" cx="92" cy="880" rx="9" ry="8" />
-      </g>
-
-      {/* Sparse juniper / sage clinging to ledges (used sparingly). */}
-      <g className="wall-juniper">
-        <circle cx="104" cy="478" r="6" />
-        <circle cx="112" cy="482" r="4" />
-        <circle cx="80" cy="698" r="5" />
-        <circle cx="128" cy="884" r="6" />
-      </g>
-
-      {/* Inner-gorge shadow wash + shadow pocket so the wall reads 3D / receding. */}
-      <rect x="0" y="0" width="220" height="1000" fill={`url(#${g('shade')})`} />
     </svg>
   );
 }
 
+/**
+ * The carved FOREGROUND wall silhouette. The top edge is a dramatic eroded
+ * skyline (outer mesa shoulder → notch → spire saddle → arch shoulder → step
+ * down toward the inner gorge); the inner edge (x≈360) descends to the floor in
+ * eroded steps. Drawn clockwise from the top-outer corner. Reused for the body
+ * fill, the strata clip and the decoration clip so they always agree.
+ */
+const WALL_PATH =
+  'M0,108 ' +
+  // GUARDIAN MESA outer shoulder (its flat cap is the highest skyline point)
+  'L18,108 L96,70 L96,300 ' +
+  // deep SADDLE across the spire field so the hoodoos rise free against sky
+  'L112,300 L150,300 L176,300 ' +
+  // ARCH springs up out of the body (its piers + sky-through gap stand above)
+  'L228,300 ' +
+  // shoulder dips again, BALANCED ROCK perches on this lower neck shelf
+  'L250,250 L290,250 ' +
+  // recede to the inner STEP BUTTES, then drop to the canyon floor
+  'L360,300 ' +
+  'L360,1000 L0,1000 Z';
+
 /** Y positions for the thin horizontal strata rules down the wall. */
-const STRATA_Y = [60, 128, 188, 244, 300, 360, 414, 470, 520, 576, 632, 690, 742, 792, 840, 892, 940];
+const STRATA_Y = [
+  168, 220, 272, 330, 388, 448, 508, 568, 628, 688, 748, 800, 852, 904, 952,
+];
 
 /**
- * The dramatic river along the canyon floor — the showpiece. A wide teal
- * waterway with: a banded base current, a flowing ripple/sparkle sheen, foam
- * lines, a sky-reflection sheen near the surface, and a small rapid/standing
- * wave. All motion is CSS and reduced-motion-gated; the water body itself stays.
+ * The dramatic river along the canyon FLOOR — the showpiece. A wide teal
+ * waterway sitting clearly at the bottom of the gorge with: shoreline banks, a
+ * deep channel, a banded flowing current, a travelling ripple/sparkle sheen,
+ * foam lines, a sky reflection near the surface, a WATERFALL spilling in from
+ * one wall and a set of RAPIDS. All motion is CSS and reduced-motion-gated; the
+ * water body, banks and waterfall column themselves stay rendered.
  */
 function GorgeRiver(): ReactElement {
   return (
     <div className="gorge-river">
-      {/* far bank shadow where water meets the wall feet */}
-      <div className="river-bank" />
+      {/* sloped shoreline banks where the canyon walls meet the water */}
+      <div className="river-bank river-bank-left" />
+      <div className="river-bank river-bank-right" />
+      {/* a WATERFALL spilling down the left wall into the river */}
+      <div className="river-fall">
+        <span className="fall-mist" />
+        <span className="fall-pool" />
+      </div>
       {/* sky reflection sheen near the surface */}
       <div className="river-reflect" />
       {/* the flowing current (animated band texture) */}
       <div className="river-current" />
+      {/* deeper channel sheen scrolling at a different rate (depth) */}
+      <div className="river-current river-current-deep" />
       {/* travelling sparkle highlight */}
       <div className="river-sheen" />
       {/* foam lines riding the surface */}
       <div className="river-foam river-foam-1" />
       <div className="river-foam river-foam-2" />
-      {/* a small rapid / standing wave with a fleck of whitewater */}
-      <div className="river-rapid">
+      <div className="river-foam river-foam-3" />
+      {/* a set of RAPIDS / standing waves with flecks of whitewater */}
+      <div className="river-rapid river-rapid-1">
+        <span className="rapid-spray" />
+      </div>
+      <div className="river-rapid river-rapid-2">
         <span className="rapid-spray" />
       </div>
     </div>

@@ -2482,15 +2482,17 @@ button.secondary {
 }
 
 /* Sky strip: the rim opening overhead. A bright sky gradient with drifting
-   clouds and a distant butte range. Sits behind the walls. */
+   clouds and a distant butte range. Sits behind the walls; tall enough that the
+   carved wall SKYLINE (mesas, spires, arch, balanced rock) silhouettes against
+   open sky before the rock body fills the rest of the frame. */
 .gorge-sky {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 30%;
-  min-height: 180px;
-  background: linear-gradient(180deg, var(--sky-1) 0%, var(--sky-2) 58%, var(--sky-3) 100%);
+  height: 42%;
+  min-height: 280px;
+  background: linear-gradient(180deg, var(--sky-1) 0%, var(--sky-2) 64%, var(--sky-3) 100%);
 }
 .gorge-clouds {
   position: absolute;
@@ -2529,16 +2531,16 @@ button.secondary {
   opacity: 0.34;
 }
 
-/* The two towering walls. Each is a fixed-width column pinned to its edge,
-   spanning the full viewport height. The right wall is the left, mirrored. They
-   are WIDE enough to read as cliffs and to fill the side margins on wide
-   screens; they extend a touch past the viewport so the inner jagged edge never
-   reveals a seam. */
+/* The two towering walls. Each is a column pinned to its edge spanning the full
+   viewport height. The right wall is the left, mirrored. They are WIDE enough to
+   read as real cliffs and to fill the side margins on wide screens. The SVG is
+   drawn full-bleed with the carved SKYLINE pinned to the top, so the mesas,
+   spires, arch and balanced rock silhouette against the sky strip behind. */
 .gorge-wall {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: clamp(180px, 17vw, 300px);
+  width: clamp(210px, 20vw, 340px);
   overflow: hidden;
 }
 .gorge-wall-left { left: 0; }
@@ -2548,22 +2550,41 @@ button.secondary {
   inset: 0;
   width: 100%;
   height: 100%;
+  /* a long shadow cast from the cliff into the gorge so it reads as a wall */
+  filter: drop-shadow(6px 0 10px rgba(0, 0, 0, 0.4));
 }
 
 /* ---- Wall formation styling ------------------------------------------- */
-.wall-strata rect { fill: rgba(0, 0, 0, 0.16); }
-.wall-ledges polygon { fill: rgba(0, 0, 0, 0.34); }
-.wall-ledge-lip rect { fill: rgba(255, 240, 210, 0.32); }
+/* Receding far wall: hazed, paler, set behind for canyon depth. */
+.wall-far-body { opacity: 0.92; }
+.wall-far-haze { opacity: 1; }
 
-.arch-mass { fill: #8a3f2c; }
-.arch-void { fill: rgba(6, 8, 12, 0.92); }
-.arch-rim { fill: rgba(255, 240, 210, 0.4); }
+.wall-strata rect { fill: rgba(0, 0, 0, 0.14); }
+.wall-ledges polygon { fill: rgba(0, 0, 0, 0.36); }
+.wall-ledge-lip rect { fill: rgba(255, 240, 210, 0.34); }
+.wall-runnels rect { fill: rgba(0, 0, 0, 0.22); }
 
-.hoodoo-stem { fill: #c4683c; }
-.hoodoo-cap,
-.hoodoo-cap2 { fill: #d98a4f; }
-.wall-hoodoos rect { stroke: rgba(0, 0, 0, 0.32); stroke-width: 1; }
+/* THE GUARDIAN MESA — tall flat-topped caprock at the outer edge. */
+.mesa-body { fill: #d9b07a; }
+.mesa-cap { fill: #f0e0bd; }
+.mesa-shadow { fill: rgba(0, 0, 0, 0.28); }
 
+/* THE SENTINEL SPIRES — tapered hoodoo spires with bulbous caps + a waist band. */
+.spire { fill: #cf7b46; stroke: rgba(0, 0, 0, 0.3); stroke-width: 1; }
+.spire-cap { fill: #e0a96d; stroke: rgba(0, 0, 0, 0.28); stroke-width: 1; }
+.spire-cap2 { fill: #d98a4f; stroke: rgba(0, 0, 0, 0.24); stroke-width: 1; }
+
+/* SKYBRIDGE ARCH — the void is the page sky showing through the opening. */
+.arch-mass { fill: #b15833; }
+.arch-rim { fill: rgba(255, 240, 210, 0.42); }
+.arch-inner { fill: rgba(0, 0, 0, 0.3); }
+
+/* BALANCED ROCK — a boulder perched on a slender neck. */
+.balanced-neck { fill: #9a4a2e; }
+.balanced-cap { fill: #c66a40; stroke: rgba(0, 0, 0, 0.3); stroke-width: 1; }
+.balanced-shadow { fill: rgba(0, 0, 0, 0.22); }
+
+/* THE STEP BUTTES — descending mesas stepping into the gorge. */
 .butte-body { fill: #b9502f; }
 .butte-cap { fill: #e0a96d; }
 
@@ -2572,25 +2593,90 @@ button.secondary {
 
 .wall-juniper circle { fill: var(--green-juniper); opacity: 0.92; }
 
-/* ---- The dramatic river along the canyon floor (the showpiece) -------- */
+/* ---- The dramatic river at the canyon FLOOR (the showpiece) ----------- */
 .gorge-river {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  height: clamp(56px, 9vh, 104px);
+  height: clamp(96px, 17vh, 188px);
   overflow: hidden;
-  background: linear-gradient(180deg, var(--river-bright) 0%, var(--river) 30%, var(--river-deep) 100%);
-  box-shadow: inset 0 3px 0 rgba(220, 255, 250, 0.35),
-    inset 0 -6px 12px rgba(0, 0, 0, 0.45);
+  /* the channel: a sunlit shallow surface deepening to a dark central channel */
+  background:
+    linear-gradient(180deg,
+      rgba(220, 255, 250, 0.32) 0%,
+      var(--river-bright) 10%,
+      var(--river) 34%,
+      var(--turquoise-deep) 64%,
+      var(--river-deep) 100%);
+  box-shadow:
+    inset 0 4px 0 rgba(220, 255, 250, 0.5),
+    inset 0 -10px 18px rgba(0, 0, 0, 0.5);
 }
-/* Dark bank shadow where the water meets the wall feet on each side. */
+/* Sloped SHORELINE banks where the canyon walls descend into the water — a wet
+   dark rock margin that grounds the river between the cliffs. */
 .river-bank {
   position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(90deg, rgba(8, 10, 14, 0.55) 0%, transparent 16%),
-    linear-gradient(270deg, rgba(8, 10, 14, 0.55) 0%, transparent 16%);
+  top: 0;
+  bottom: 0;
+  width: clamp(60px, 14vw, 200px);
+  pointer-events: none;
+}
+.river-bank-left {
+  left: 0;
+  background: linear-gradient(90deg, rgba(40, 26, 20, 0.85) 0%, rgba(86, 47, 44, 0.4) 40%, transparent 100%);
+  clip-path: polygon(0 0, 100% 0, 60% 100%, 0 100%);
+}
+.river-bank-right {
+  right: 0;
+  background: linear-gradient(270deg, rgba(40, 26, 20, 0.85) 0%, rgba(86, 47, 44, 0.4) 40%, transparent 100%);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 40% 100%);
+}
+/* A WATERFALL spilling down the left wall into the river — a bright falling
+   column of water with rising mist and a churned plunge pool. */
+.river-fall {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: clamp(40px, 9vw, 120px);
+  width: clamp(18px, 2.4vw, 34px);
+  background: linear-gradient(180deg,
+    rgba(235, 255, 252, 0.95) 0%,
+    rgba(120, 226, 211, 0.85) 45%,
+    rgba(73, 197, 180, 0.6) 100%);
+  box-shadow: 0 0 10px rgba(220, 255, 250, 0.5);
+  /* the falling streaks */
+  background-size: 100% 26px;
+  animation: gorge-fall 0.9s linear infinite;
+}
+@keyframes gorge-fall {
+  from { background-position: 0 0; }
+  to { background-position: 0 26px; }
+}
+.fall-mist {
+  position: absolute;
+  bottom: 8%;
+  left: 50%;
+  width: 46px;
+  height: 30px;
+  margin-left: -23px;
+  background: radial-gradient(60% 70% at 50% 100%, rgba(255, 255, 255, 0.7) 0%, rgba(220, 255, 250, 0.25) 55%, transparent 78%);
+  mix-blend-mode: screen;
+  animation: gorge-mist 3.2s ease-in-out infinite;
+}
+@keyframes gorge-mist {
+  0%, 100% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.25); opacity: 1; }
+}
+.fall-pool {
+  position: absolute;
+  bottom: 4%;
+  left: 50%;
+  width: 60px;
+  height: 12px;
+  margin-left: -30px;
+  background: radial-gradient(50% 100% at 50% 50%, rgba(255, 255, 255, 0.55) 0%, transparent 72%);
+  mix-blend-mode: screen;
 }
 /* Sky reflection sheen pooling near the surface. */
 .river-reflect {
@@ -2598,8 +2684,8 @@ button.secondary {
   top: 0;
   left: 0;
   right: 0;
-  height: 46%;
-  background: linear-gradient(180deg, rgba(188, 217, 230, 0.42) 0%, transparent 100%);
+  height: 40%;
+  background: linear-gradient(180deg, rgba(188, 217, 230, 0.5) 0%, transparent 100%);
   mix-blend-mode: screen;
 }
 /* The flowing current — banded teal texture scrolling sideways. */
@@ -2614,12 +2700,30 @@ button.secondary {
     var(--river-deep) 22px 28px
   );
   background-size: 44px 100%;
-  opacity: 0.85;
+  opacity: 0.8;
   animation: gorge-current 3s linear infinite;
+}
+/* A deeper, slower channel band for layered depth. */
+.river-current-deep {
+  top: 50%;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    80deg,
+    var(--river-deep) 0 12px,
+    var(--turquoise-deep) 12px 18px,
+    var(--river-deep) 18px 30px
+  );
+  background-size: 60px 100%;
+  opacity: 0.6;
+  animation: gorge-current-deep 5s linear infinite;
 }
 @keyframes gorge-current {
   from { background-position: 0 0; }
   to { background-position: -44px 0; }
+}
+@keyframes gorge-current-deep {
+  from { background-position: 0 0; }
+  to { background-position: -60px 0; }
 }
 /* Travelling sparkle highlight swept across the water surface. */
 .river-sheen {
@@ -2641,7 +2745,7 @@ button.secondary {
   from { background-position: -320px 0; }
   to { background-position: 130% 0; }
 }
-/* Foam lines riding the surface, drifting at two speeds for depth. */
+/* Foam lines riding the surface, drifting at three speeds for depth. */
 .river-foam {
   position: absolute;
   left: -10%;
@@ -2656,22 +2760,23 @@ button.secondary {
   );
   opacity: 0.7;
 }
-.river-foam-1 { top: 16%; animation: gorge-foam 7s linear infinite; }
-.river-foam-2 { top: 40%; opacity: 0.5; animation: gorge-foam 11s linear infinite reverse; }
+.river-foam-1 { top: 14%; animation: gorge-foam 7s linear infinite; }
+.river-foam-2 { top: 34%; opacity: 0.5; animation: gorge-foam 11s linear infinite reverse; }
+.river-foam-3 { top: 58%; height: 2px; opacity: 0.4; animation: gorge-foam 9s linear infinite; }
 @keyframes gorge-foam {
   from { transform: translateX(0); }
   to { transform: translateX(-54px); }
 }
-/* A small rapid / standing wave with a fleck of whitewater spray. */
+/* RAPIDS / standing waves with flecks of whitewater spray. */
 .river-rapid {
   position: absolute;
-  bottom: 18%;
-  left: 62%;
-  width: 64px;
-  height: 22px;
+  width: 72px;
+  height: 26px;
   background: radial-gradient(60% 80% at 50% 100%, rgba(255, 255, 255, 0.6) 0%, rgba(220, 255, 250, 0.2) 50%, transparent 75%);
   mix-blend-mode: screen;
 }
+.river-rapid-1 { bottom: 22%; left: 58%; }
+.river-rapid-2 { bottom: 36%; left: 34%; transform: scale(0.8); }
 .rapid-spray {
   position: absolute;
   top: -6px;
@@ -2685,16 +2790,32 @@ button.secondary {
   image-rendering: pixelated;
   animation: rapid-bob 1.6s ease-in-out infinite;
 }
+.river-rapid-2 .rapid-spray { animation-delay: -0.8s; }
 @keyframes rapid-bob {
   0%, 100% { transform: translateY(0); opacity: 0.85; }
   50% { transform: translateY(-3px); opacity: 1; }
 }
 
-/* On narrow screens the gorge stays but the walls slim to thin buttress edges so
-   they frame without crowding the (now single-column) content. */
+/* On narrow screens the gorge stays UNMISTAKABLY a canyon: the walls become a
+   framing canyon border that still carries a visible formation (the carved
+   skyline is pinned to the wall's outer edge), and the river floor keeps real
+   presence. The SVG is shifted so the dramatic outer formations (mesa, spires,
+   arch) stay in view rather than being cropped to a flat sliver. */
 @media (max-width: 880px) {
-  .gorge-wall { width: clamp(40px, 12vw, 90px); }
-  .gorge-river { height: clamp(40px, 7vh, 64px); }
+  .gorge-wall { width: clamp(84px, 22vw, 150px); }
+  .canyon-wall-svg {
+    /* show the formation-rich OUTER band of the wall on the narrow column */
+    width: 220%;
+    filter: drop-shadow(3px 0 6px rgba(0, 0, 0, 0.4));
+  }
+  .gorge-river { height: clamp(72px, 15vh, 120px); }
+  /* keep the sky generous so the formations still silhouette above the wall */
+  .gorge-sky { height: 38%; min-height: 220px; }
+}
+@media (max-width: 480px) {
+  .gorge-wall { width: clamp(64px, 26vw, 110px); }
+  .canyon-wall-svg { width: 280%; }
+  .gorge-river { height: clamp(64px, 14vh, 104px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2713,8 +2834,11 @@ button.secondary {
   .river-shimmer,
   .gorge-cloud,
   .river-current,
+  .river-current-deep,
   .river-sheen,
   .river-foam,
+  .river-fall,
+  .fall-mist,
   .rapid-spray,
   .canyon-shell.run-complete::after,
   .run-complete .slab,
