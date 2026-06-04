@@ -2,9 +2,10 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { getDocs, getRun, listProjects, listRuns, listStories, triggerRun, uploadStory, writeDocs } from './api';
 import { useEventStream } from './useEventStream';
 import { CanyonSpine } from './CanyonSpine';
+import { CanyonGorge } from './CanyonGorge';
 import { PixelWordmark } from './PixelWordmark';
 import { CanyonAtmosphere, type SkyPhase } from './CanyonAtmosphere';
-import { StageSprite, StatusMark } from './PixelSprites';
+import { ChromeGlyph, StageSprite, StatusMark } from './PixelSprites';
 import type { DocsModel, PipelineEvent, Project, RunSummary, Stage, Status, Story, StoryStatus } from './types';
 
 const STAGE_NAME: Record<Stage, string> = {
@@ -18,7 +19,8 @@ const STAGE_NAME: Record<Stage, string> = {
   decision: 'Decision'
 };
 
-// Each pipeline stage maps to a named rock layer for the strata legend / depth cue.
+// Each pipeline stage is a named ledge the run descends to — the rock layer at
+// that depth. Read top (rim) to bottom (bedrock) as the expedition descends.
 const STAGE_DEPTH: Record<Stage, string> = {
   spec: 'Rim',
   observe: 'Caprock',
@@ -122,6 +124,7 @@ export function App() {
 
   return (
     <div className="app">
+      <CanyonGorge />
       <header className="topbar">
         <div className="brand">
           <h1 className="wordmark">
@@ -161,47 +164,69 @@ export function App() {
 
       <div className="layout">
         <aside className="rail">
-          <section className="panel" aria-label="Stories">
-            <h2>Stories</h2>
-            <form className="story-form" onSubmit={onUploadStory}>
-              <input
-                className="story-input"
-                value={storyTitle}
-                onChange={(event) => setStoryTitle(event.target.value)}
-                placeholder="Title (optional)"
-                aria-label="Story title"
-              />
-              <textarea
-                className="story-input story-body"
-                value={storyBody}
-                onChange={(event) => setStoryBody(event.target.value)}
-                placeholder="Plain-English testing instructions…"
-                rows={4}
-                aria-label="Story instructions"
-              />
-              <button type="submit" disabled={running || !storyBody.trim()}>
+          <section className="panel tablet" aria-label="Field log">
+            <h2 className="tablet-head">
+              <span className="tablet-glyph" aria-hidden>
+                <ChromeGlyph name="quill" size={20} />
+              </span>
+              <span className="tablet-title">Field Log</span>
+            </h2>
+            <form className="story-form slate" onSubmit={onUploadStory}>
+              <label className="slate-field">
+                <span className="slate-label">Expedition title</span>
+                <input
+                  className="story-input"
+                  value={storyTitle}
+                  onChange={(event) => setStoryTitle(event.target.value)}
+                  placeholder="Title (optional)"
+                  aria-label="Story title"
+                />
+              </label>
+              <label className="slate-field">
+                <span className="slate-label">Field notes</span>
+                <textarea
+                  className="story-input story-body"
+                  value={storyBody}
+                  onChange={(event) => setStoryBody(event.target.value)}
+                  placeholder="Plain-English testing instructions…"
+                  rows={4}
+                  aria-label="Story instructions"
+                />
+              </label>
+              <button type="submit" className="dispatch-btn" disabled={running || !storyBody.trim()}>
                 {running ? 'Running…' : '▾ Generate test'}
               </button>
             </form>
             {stories.length === 0 ? (
-              <p className="muted">No stories yet for this project.</p>
+              <p className="muted tablet-empty">No stories logged yet for this project.</p>
             ) : (
               <ul className="storylist">
                 {stories.map((story) => (
-                  <li key={story.id}>
+                  <li key={story.id} className="trail-entry">
+                    <span className="trail-glyph" aria-hidden>
+                      <ChromeGlyph name="trail" size={18} />
+                    </span>
                     <span className="story-title">{story.title}</span>
-                    <Chip text={story.status} kind={storyKind(story.status)} />
+                    <span className={`trail-stamp trail-stamp-${storyKind(story.status)}`}>
+                      <StatusMark status={storyKind(story.status)} size={11} />
+                      {story.status}
+                    </span>
                   </li>
                 ))}
               </ul>
             )}
           </section>
-          <section className="panel" aria-label="Run history">
-            <h2>Expeditions</h2>
+          <section className="panel tablet" aria-label="Expeditions">
+            <h2 className="tablet-head">
+              <span className="tablet-glyph" aria-hidden>
+                <ChromeGlyph name="flag" size={20} />
+              </span>
+              <span className="tablet-title">Expeditions</span>
+            </h2>
           {runsError && <p className="muted">Couldn’t load runs: {runsError}</p>}
           <ul className="runlist">
             <li>
-              <button className={selected === null ? 'active' : ''} onClick={() => setSelected(null)}>
+              <button className={`ledger-row live-row ${selected === null ? 'active' : ''}`} onClick={() => setSelected(null)}>
                 <span className="runlist-title">
                   <span className={`live-dot ${connection}`} aria-hidden /> Live view
                 </span>
@@ -218,7 +243,7 @@ export function App() {
                 )}
                 {runs.map((run) => (
                   <li key={run.runId}>
-                    <button className={selected === run.runId ? 'active' : ''} onClick={() => setSelected(run.runId)}>
+                    <button className={`ledger-row ${selected === run.runId ? 'active' : ''}`} onClick={() => setSelected(run.runId)}>
                       <span className="runlist-title">
                         {run.runId.replace(/^demo-/, '').replace(/T/, ' ').replace(/-\d+Z$/, '')}
                       </span>
@@ -418,9 +443,9 @@ function useClampedProgress(raw: number): number {
 }
 
 /**
- * A number that briefly pulses when its value increases — used so "LAYERS
- * CARVED" gives a small tick of life each time a new stratum is carved. The
- * pulse is a one-shot CSS animation re-triggered by toggling a data attribute.
+ * A number that briefly pulses when its value increases — used so "LEDGES
+ * DESCENDED" gives a small tick of life each time the run drops to a new ledge.
+ * The pulse is a one-shot CSS animation re-triggered by toggling a data attribute.
  */
 function PulseNum({ value, className }: { value: number; className?: string }) {
   const prev = useRef(value);
@@ -463,7 +488,7 @@ function CanyonHero({ connection }: { connection: string }) {
         <div className="hero-copy hero-copy-sky">
           <h2>Watch a run descend the canyon</h2>
           <p className="muted">
-            Each pipeline stage carves a rock layer as it runs. Press <strong>Run demo</strong> to stream one live.
+            Each pipeline stage descends one ledge deeper into the canyon. Press <strong>Run demo</strong> to stream a descent live.
           </p>
           <p className={`stream-note stream-${connection}`}>
             <span className={`dot ${connection}`} aria-hidden /> {CONNECTION_NOTE[connection] ?? connection}
@@ -530,7 +555,7 @@ function LiveCanyonRun({ events, connection }: { events: PipelineEvent[]; connec
         <aside className="depth-gauge" aria-label="Run depth and elapsed time">
           <div className="gauge-block">
             <PulseNum value={reached} className="gauge-num" />
-            <span className="gauge-lab">layers carved</span>
+            <span className="gauge-lab">ledges descended</span>
           </div>
           <div className="gauge-block">
             <span className="gauge-num" aria-live="polite">{elapsed}</span>
@@ -989,33 +1014,59 @@ function DocsView({ projectId }: { projectId: string }) {
     );
   }
   return (
-    <div className="panel docs">
-      <div className="docs-head">
-        <h2>{docs.project.name} — Living Docs</h2>
-        <button className="secondary" onClick={onWrite}>
+    <div className="panel tablet docs">
+      {/* Survey-journal masthead: the Living Docs header reads as the cover plate
+          of a field survey-journal, with the WRITE-TO-REPO action stamped beside it. */}
+      <div className="docs-masthead">
+        <span className="docs-masthead-glyph" aria-hidden>
+          <ChromeGlyph name="quill" size={22} />
+        </span>
+        <div className="docs-masthead-text">
+          <span className="docs-kicker">Survey journal · living docs</span>
+          <h2 className="docs-title">{docs.project.name}</h2>
+        </div>
+        <button className="docs-write-btn" onClick={onWrite}>
           ▾ Write to repo
         </button>
       </div>
-      {written && <p className="muted docs-written">{written}</p>}
+      <div className="docs-masthead-rule" aria-hidden />
+      {written && (
+        <p className="docs-written" role="status">
+          <span className="docs-written-stamp" aria-hidden>✓</span>
+          {written}
+        </p>
+      )}
       {docs.flows.length === 0 ? (
-        <p className="muted">No stories yet — upload one to document a flow.</p>
+        <p className="muted docs-empty">No stories yet — log one in the Field Log to document a flow.</p>
       ) : (
         <div className="doclist">
           {docs.flows.map((flow) => (
-            <article className="doc-card" key={flow.storyId}>
-              <header className="doc-card-head">
-                <h3>{flow.title}</h3>
-                <Chip text={flow.status} kind={storyKind(flow.status)} />
+            <article className="flow-tablet" key={flow.storyId}>
+              <header className="flow-head">
+                <h3 className="flow-title">{flow.title}</h3>
+                <span className={`flow-stamp flow-stamp-${storyKind(flow.status)}`}>
+                  <StatusMark status={storyKind(flow.status)} size={12} />
+                  {flow.status}
+                </span>
               </header>
-              <p className="doc-instr">{flow.instructions}</p>
-              <ol className="doc-steps">
+              <div className="flow-rule" aria-hidden />
+              <dl className="flow-meta">
+                <div className="flow-meta-cell">
+                  <dt>Flow · source</dt>
+                  <dd>{flow.source}</dd>
+                </div>
+                <div className="flow-meta-cell">
+                  <dt>Backed by</dt>
+                  <dd><code>{flow.testRef}</code></dd>
+                </div>
+              </dl>
+              <p className="flow-instr">{flow.instructions}</p>
+              <div className="flow-steps-head" aria-hidden>Field notes</div>
+              <ol className="flow-steps">
                 {flow.steps.map((step, index) => (
                   <li key={index}>{step}</li>
                 ))}
               </ol>
-              <p className="doc-test">
-                backed by <code>{flow.testRef}</code> · source {flow.source}
-              </p>
             </article>
           ))}
         </div>

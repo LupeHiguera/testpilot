@@ -121,6 +121,72 @@ const SPRITES: Record<Stage, string[]> = {
 
 const U = 3; // SVG unit per pixel block
 
+/**
+ * Chrome glyphs for the carved field-tablet headers + inbox rows. Same 8x8
+ * grid + palette system as the stage sprites so the sidebar belongs to the
+ * same hand-plotted world. Keyed by a plain name (not a Stage).
+ */
+const GLYPHS: Record<string, string[]> = {
+  // Field Log — a quill pen nib tilted over a written line (the story journal).
+  quill: [
+    '......yw',
+    '.....ywy',
+    '....yws.',
+    '...yws..',
+    '..ywss..',
+    '.ywsk...',
+    'ywsk....',
+    'kkkkkk..'
+  ],
+  // Expeditions — a pennant flag on a pole planted in the ground.
+  flag: [
+    'kgggg...',
+    'kggggg..',
+    'kgggggg.',
+    'kggggg..',
+    'kgg.....',
+    'k.......',
+    'k.......',
+    'wwkww...'
+  ],
+  // Story inbox row — a signpost / trail blaze marking an expedition entry.
+  trail: [
+    '.oooooo.',
+    'oowwwwo.',
+    'oowwwwoo',
+    '.oooooo.',
+    '...ss...',
+    '...ss...',
+    '...ss...',
+    '..wssw..'
+  ]
+};
+
+export function ChromeGlyph({ name, size = 16 }: { name: keyof typeof GLYPHS; size?: number }): ReactElement {
+  const grid = GLYPHS[name];
+  const rects: ReactElement[] = [];
+  grid.forEach((row, y) => {
+    [...row].forEach((ch, x) => {
+      const fill = INK[ch] ?? 'transparent';
+      if (fill === 'transparent') return;
+      rects.push(<rect key={`${x}-${y}`} x={x * U} y={y * U} width={U} height={U} fill={fill} />);
+    });
+  });
+  return (
+    <svg
+      className="sprite glyph"
+      width={size}
+      height={size}
+      viewBox={`0 0 ${8 * U} ${8 * U}`}
+      role="img"
+      aria-hidden
+      shapeRendering="crispEdges"
+    >
+      {rects}
+    </svg>
+  );
+}
+
 export function StageSprite({ stage, size = 24 }: { stage: Stage; size?: number }): ReactElement {
   const grid = SPRITES[stage];
   const rects: ReactElement[] = [];
