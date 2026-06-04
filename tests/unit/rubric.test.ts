@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { PASS_THRESHOLD, RUBRIC_CRITERIA, rubricMarkdown } from '../../tools/grader-mcp/rubric.js';
 
 describe('grader rubric', () => {
-  it('exposes seven criteria and a pass threshold', () => {
-    expect(RUBRIC_CRITERIA).toHaveLength(7);
+  it('exposes the criteria (incl. wow_factor) and a pass threshold', () => {
+    expect(RUBRIC_CRITERIA).toHaveLength(8);
+    expect(RUBRIC_CRITERIA.map((c) => c.id)).toContain('wow_factor');
     expect(PASS_THRESHOLD.everyCriterionAtLeast).toBe(3);
     expect(PASS_THRESHOLD.noCriterionBelow).toBe(2);
   });
