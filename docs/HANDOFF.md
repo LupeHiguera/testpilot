@@ -1,5 +1,40 @@
 # testpilot — session handoff / restart notes
 
+> ## UPDATE — 2026-06-04 (later session): gorge rolled back + 10 loops run
+> **The over-reach below is RESOLVED.** Option A was executed: the full-bleed
+> `CanyonGorge` was deleted (component + `<CanyonGorge/>` in App.tsx + the gorge
+> CSS block & `.layout` margins in theme.css), keeping the field-tablet chrome +
+> sundown hero. Build green, 37 tests pass, axe-0.
+> Then **10 coder↔grader loops (iters 14–23)** pushed the whole site from avg **7.3 → 9.0**:
+> | criterion | 13 (base) | 23 (final) |
+> |---|---|---|
+> | wow_factor | 7 | 8 |
+> | theme_craft | 7 | **10** |
+> | evidence_altitude | 6 | 9 |
+> | liveness | 7 | 9 |
+> | real_data | 8 | 9 |
+> | design_system | 7 | **10** |
+> | accessibility | 8 | 9 |
+> | engineering | 8 | 8 |
+>
+> Key additions over the run: a **Judgment Ledger** verdict moment (real before/after
+> plates + inline diff + color-keyed stamped seal: rust=refused/teal=repaired/gold=guarded),
+> carved Expeditions ledger with per-row verdict cue + selected-row "why", carved topbar
+> (tabs + project select) with a teal live-LED, carved diff block, form focus micro-motion,
+> ambient sheen, and on-theme empty/error/reconnect states.
+> **Harness change:** `tools/grader-mcp/harness.mjs capture` now drives a live run at ALL
+> three viewports (1440/768/375), not just 1440.
+> **Still capping (both at 8):** `wow_factor` (long strata column is uniform row-to-row —
+> wants an altitude/lighting progression or milestone-step treatment) and `engineering`
+> (wants a stated perf budget / visible read-layer test coverage).
+> **Committed (this session, on `main`):** the rollback + 10 loops + the all-viewport harness
+> change landed as one UI commit; a follow-on commit adds the agentic-core repair loop
+> (`src/repair/repairLoop.ts` — bounded re-observe retry). `Draft.md`/`.snap.mjs` stay untracked.
+>
+> _Everything below is the PRIOR handoff that prompted the rollback — kept for context._
+
+---
+
 _Written 2026-06-04 because the context window filled (94%) and the UI direction
 over-reached. Read this first in a fresh session, then `git log --oneline` for hashes._
 

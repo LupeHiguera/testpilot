@@ -21,10 +21,10 @@ try {
   if (command === 'capture') {
     const url = arg ?? 'http://127.0.0.1:4000';
     const shots = {};
-    // 1440 with a live run so the canyon is populated; smaller widths show the shell.
-    shots['1440'] = pathOf(await client.callTool({ name: 'capture_ui', arguments: { url, viewport: 1440, triggerRun: true } }));
-    for (const viewport of [768, 375]) {
-      shots[String(viewport)] = pathOf(await client.callTool({ name: 'capture_ui', arguments: { url, viewport } }));
+    // Drive a live run at EVERY viewport so the canyon is populated and the verdict
+    // moment is captured responsively (1440/768/375), not just on desktop.
+    for (const viewport of [1440, 768, 375]) {
+      shots[String(viewport)] = pathOf(await client.callTool({ name: 'capture_ui', arguments: { url, viewport, triggerRun: true } }));
     }
     const checksResult = await client.callTool({ name: 'run_ui_checks', arguments: { url } });
     const checks = JSON.parse(textOf(checksResult));

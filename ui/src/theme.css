@@ -248,9 +248,12 @@ button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
+/* Consistent, on-theme keyboard focus ring across EVERY interactive control: a
+   2px sun-gold outline with a clear offset. Static (no animation) so it reads
+   identically under prefers-reduced-motion — keyboard focus is never invisible. */
 button:focus-visible {
-  outline: var(--px) dashed var(--sand);
-  outline-offset: var(--px);
+  outline: calc(2 * var(--px)) solid var(--sun);
+  outline-offset: calc(2 * var(--px));
 }
 button.secondary {
   color: var(--sand);
@@ -261,7 +264,7 @@ button.secondary {
 /* ---- Layout ------------------------------------------------------------- */
 .app {
   position: relative;
-  z-index: 1; /* sits above the fixed canyon gorge backdrop */
+  z-index: 1;
   min-height: 100%;
   display: grid;
   grid-template-rows: auto 1fr;
@@ -313,11 +316,20 @@ button.secondary {
     flex-basis: 100%;
     height: 0;
   }
+  .rim-console {
+    flex-wrap: wrap;
+    width: 100%;
+    justify-content: flex-start;
+  }
   .topbar .proj {
     min-width: 0;
   }
-  .topbar .proj select {
-    max-width: 36vw;
+  .proj-slot {
+    min-width: 0;
+  }
+  .proj-slot select {
+    max-width: 40vw;
+    text-overflow: ellipsis;
   }
   .brand {
     min-width: 0;
@@ -331,15 +343,58 @@ button.secondary {
   }
 }
 
+/* The rim console: the topbar control cluster reads as one carved instrument
+   panel routed into the rim rock — the tabs, project dial, status readout, and
+   run stamp all seated in a single recessed channel rather than floating as
+   generic dark-dashboard chrome. */
+.rim-console {
+  display: inline-flex;
+  align-items: stretch;
+  gap: var(--s2);
+  padding: var(--s2);
+  background: linear-gradient(180deg, var(--tablet-face-2), #1a242c);
+  border: var(--px) solid var(--tablet-base);
+  box-shadow:
+    inset 0 var(--px) 0 var(--tablet-lip),
+    inset 0 calc(-1 * var(--px)) 0 var(--engrave);
+}
+.rim-console > * {
+  align-self: center;
+}
+/* Connection status: a carved instrument readout — an etched stone chip with the
+   square pixel state dot and the uppercase mono state engraved into it. */
 .conn {
   display: inline-flex;
   align-items: center;
   gap: var(--s2);
   font-family: var(--mono);
   font-size: var(--t-xs);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--sand-dim);
+  padding: var(--s2) var(--s3);
+  background: var(--slot-well-1);
+  border: var(--px) solid var(--tablet-base);
+  box-shadow:
+    inset 0 calc(2 * var(--px)) var(--px) var(--slot-top-shadow),
+    inset 0 calc(-1 * var(--px)) 0 var(--slot-base-lip);
+  text-shadow: 0 var(--px) 0 var(--engrave);
+}
+/* The readout tone-keys to the stream state so a degraded connection reads as an
+   intentional carved instrument state, not a stale grey word: open = teal, while
+   CONNECTING (reconnecting) warms to sun and CLOSED glows rust. Driven by the
+   same `connection` class the dot uses; colours clear AA on the dark slot well. */
+.conn.open {
+  color: var(--turquoise-bright);
+  border-color: var(--turquoise-deep);
+}
+.conn.connecting {
+  color: var(--sun-bright);
+  border-color: #8a6520;
+}
+.conn.closed {
+  color: var(--canyon-red-bright);
+  border-color: #7a2a1f;
 }
 /* Square pixel status dots. State is encoded by SHAPE as well as colour so it
    is not colour-only (a11y): open = filled square, connecting = hollow square,
@@ -405,25 +460,6 @@ button.secondary {
   width: 100%;
   margin: 0 auto;
 }
-/* On wide viewports, NARROW the centered content column and push it well off the
-   edges so a GENEROUS band of canyon wall shows on each side — wide enough for the
-   real formations (mesa, hoodoo spires, sky-through arch, balanced rock) and the
-   waterfall to silhouette in the open margin, not flat slivers behind the panels.
-   The wall column width (~clamp .. 360px) and this inset are tuned to agree: at
-   1440 the content caps near 1040px, leaving ~200px of live canyon each side. */
-@media (min-width: 1180px) {
-  .layout {
-    max-width: 1040px;
-    padding-left: clamp(var(--s5), 4vw, 64px);
-    padding-right: clamp(var(--s5), 4vw, 64px);
-    margin-inline: auto;
-  }
-}
-@media (min-width: 1440px) {
-  .layout {
-    max-width: 1000px;
-  }
-}
 @media (max-width: 880px) {
   .layout {
     grid-template-columns: 1fr;
@@ -465,6 +501,31 @@ button.secondary {
     inset 0 calc(-1 * var(--px)) 0 var(--tablet-base),
     0 var(--px) 0 var(--tablet-base);
 }
+/* Faint ambient life on the otherwise-static carved panel: a very slow sunlit
+   sheen drifts diagonally across the stone. Extremely low alpha so it never
+   touches text contrast; pointer-events none so it never blocks the form. */
+.tablet::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: linear-gradient(
+    115deg,
+    transparent 40%,
+    rgba(255, 240, 210, 0.04) 50%,
+    transparent 60%
+  );
+  transform: translateX(-110%);
+  animation: tablet-sheen 14s ease-in-out infinite;
+}
+.tablet:nth-of-type(2)::after { animation-delay: 7s; }
+@keyframes tablet-sheen {
+  0%, 80%, 100% { transform: translateX(-110%); }
+  92% { transform: translateX(110%); }
+}
+/* Keep interactive + textual content above the sheen overlay. */
+.tablet > * { position: relative; z-index: 2; }
 /* A chiseled corner notch (top-left) so the slab reads as quarried stone. */
 .tablet::before {
   content: '';
@@ -546,33 +607,119 @@ button.secondary {
    tablet — a recessed stone slip with a sunlit top lip + shadow base, and a
    left "spine" edge so the column reads as a stacked field ledger. */
 .runlist li button.ledger-row {
+  position: relative;
   width: 100%;
   text-align: left;
   text-transform: none;
   letter-spacing: 0;
   font-family: var(--sans);
   color: var(--sand);
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.3));
+  /* Carved sandstone, matching the Field Log tablet: a warm dusk-stone face with
+     a faint fleck grain, a sunlit chiseled top lip and a deep shadow base. */
+  background:
+    radial-gradient(var(--parchment-grain) 1px, transparent 1px) 0 0 / 6px 6px,
+    radial-gradient(var(--parchment-grain) 1px, transparent 1px) 3px 3px / 6px 6px,
+    linear-gradient(180deg, var(--tablet-face) 0%, var(--tablet-face-2) 100%);
   border: var(--px) solid var(--tablet-base);
-  /* a carved binding spine down the left edge */
-  border-left: 4px solid var(--tablet-lip);
+  /* a carved binding spine down the left edge — a struck channel, not a hairline */
+  border-left: 6px solid var(--tablet-lip);
   box-shadow:
-    inset 0 var(--px) 0 rgba(246, 236, 216, 0.08),
-    inset 0 calc(-1 * var(--px)) 0 var(--engrave);
+    inset 0 var(--px) 0 var(--tablet-lip),
+    inset 0 calc(-1 * var(--px)) 0 var(--engrave),
+    inset 6px 0 0 calc(-1 * var(--px)) var(--engrave),
+    0 var(--px) 0 var(--tablet-base);
   padding: var(--s2) var(--s3);
   display: block;
+  overflow: hidden;
+  /* Hover/focus warms the spine + lifts a faint sunlit top edge; transition kept
+     short and on box-shadow/filter only (no layout) so it's reduced-motion safe. */
+  transition: box-shadow 0.12s ease, filter 0.12s ease, border-left-color 0.12s ease;
 }
-.runlist li button.ledger-row:hover:not(.active) {
-  filter: brightness(1.12);
+/* A slow sunlit sheen drifts across the carved row — faint ambient life on the
+   otherwise-static ledger (transform/opacity only). Stamped pseudo-element so it
+   never affects layout or interaction. */
+.runlist li button.ledger-row::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 38%,
+    rgba(255, 240, 210, 0.07) 50%,
+    transparent 62%
+  );
+  transform: translateX(-120%);
+  animation: ledger-sheen 9s ease-in-out infinite;
+}
+.runlist li button.ledger-row:nth-child(2n)::after { animation-delay: 3s; }
+.runlist li button.ledger-row:nth-child(3n)::after { animation-delay: 6s; }
+@keyframes ledger-sheen {
+  0%, 72%, 100% { transform: translateX(-120%); }
+  86% { transform: translateX(120%); }
+}
+/* On-theme hover/focus cue for the resting ledger: the carved row warms, its
+   binding spine brightens, a faint sunlit edge-light catches the top lip, and the
+   stone presses in slightly (an inset base shadow). Micro, not flashy. Keyboard
+   focus-visible shares the exact cue so focus is never invisible. */
+.runlist li button.ledger-row:hover:not(.active),
+.runlist li button.ledger-row:focus-visible:not(.active) {
+  filter: brightness(1.1);
   border-left-color: var(--rim-bright);
+  /* sunlit top lip + a slightly deeper struck spine + a soft inset "press" base */
+  box-shadow:
+    inset 0 var(--px) 0 rgba(255, 240, 210, 0.28),
+    inset 0 calc(-1 * var(--px)) 0 var(--engrave),
+    inset 6px 0 0 calc(-1 * var(--px)) var(--engrave),
+    inset 0 calc(-2 * var(--px)) calc(2 * var(--px)) rgba(0, 0, 0, 0.32),
+    0 var(--px) 0 var(--tablet-base);
+}
+/* Keep the carved warm cue above, but add the same 2px sun-gold ring as every
+   other control so keyboard focus on a ledger row is unmistakable and consistent.
+   Offset inward so the ring sits cleanly inside the row's own carved border. */
+.runlist li button.ledger-row:focus-visible {
+  outline: calc(2 * var(--px)) solid var(--sun);
+  outline-offset: calc(-2 * var(--px));
 }
 .runlist li button.ledger-row.active {
   border-color: var(--sun);
-  border-left: 4px solid var(--sun);
-  background: linear-gradient(180deg, rgba(255, 207, 94, 0.1), rgba(0, 0, 0, 0.32));
+  border-left: 6px solid var(--sun);
+  background:
+    radial-gradient(var(--parchment-grain) 1px, transparent 1px) 0 0 / 6px 6px,
+    radial-gradient(var(--parchment-grain) 1px, transparent 1px) 3px 3px / 6px 6px,
+    linear-gradient(180deg, rgba(255, 207, 94, 0.12) 0%, var(--tablet-face-2) 100%);
   box-shadow:
-    inset 0 var(--px) 0 rgba(255, 225, 153, 0.25),
-    inset 0 calc(-1 * var(--px)) 0 var(--engrave);
+    inset 0 var(--px) 0 rgba(255, 225, 153, 0.3),
+    inset 0 calc(-1 * var(--px)) 0 var(--engrave),
+    inset 6px 0 0 calc(-1 * var(--px)) rgba(255, 207, 94, 0.3),
+    0 var(--px) 0 var(--tablet-base);
+}
+/* Each past run is color-keyed at its carved binding spine to its verdict tone
+   (rust = regression/refused, teal = repair applied, gold = guarded), so the
+   stack reads as stamped ledger entries at a glance — before any text is read.
+   The active row's gold spine (above) still wins, marking the open entry. */
+.runlist li button.ledger-row.stamped-error:not(.active) {
+  border-left-color: var(--canyon-red);
+}
+.runlist li button.ledger-row.stamped-repaired:not(.active) {
+  border-left-color: var(--turquoise-deep);
+}
+.runlist li button.ledger-row.stamped-guarded:not(.active) {
+  /* a deep, settled amber — gold-keyed but dimmer than the active row's --sun
+     spine, so the open entry still wins visually. */
+  border-left-color: #b8822e;
+}
+.runlist li button.ledger-row.stamped-error:hover:not(.active),
+.runlist li button.ledger-row.stamped-error:focus-visible:not(.active) {
+  border-left-color: var(--canyon-red-bright);
+}
+.runlist li button.ledger-row.stamped-repaired:hover:not(.active),
+.runlist li button.ledger-row.stamped-repaired:focus-visible:not(.active) {
+  border-left-color: var(--turquoise);
+}
+.runlist li button.ledger-row.stamped-guarded:hover:not(.active),
+.runlist li button.ledger-row.stamped-guarded:focus-visible:not(.active) {
+  border-left-color: var(--sun);
 }
 /* The "Live view" row leads the ledger — a faint turquoise spine marks it. */
 .runlist li button.ledger-row.live-row {
@@ -600,6 +747,104 @@ button.secondary {
   gap: var(--s1);
   margin-top: var(--s2);
   flex-wrap: wrap;
+}
+/* A COMPACT color-keyed verdict cue embossed into every past-run ledger row at
+   rest — the same rust/teal/gold key as the bedrock verdict slab. At rest it is
+   just the stamp mark + tone WORD (the verdict at a glance), so the Expeditions
+   log reads as a calm, scannable stamped ledger. The full prose one-line "why"
+   is gated behind focus (the selected row, or the single most-recent run) — see
+   .history-seal-why / .ledger-row.active .history-seal below. Tone colours come
+   from the shared .slab-error / .slab-repaired / .slab-guarded keys. */
+.history-seal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  margin-top: var(--s2);
+  padding: var(--s1) var(--s2);
+  background: rgba(0, 0, 0, 0.28);
+  border: var(--px) solid #00000066;
+  border-left: 3px solid currentColor;
+  box-shadow:
+    inset 0 var(--px) 0 rgba(255, 240, 210, 0.1),
+    inset 0 calc(-1 * var(--px)) 0 rgba(0, 0, 0, 0.5);
+}
+.history-seal.slab-error { color: var(--canyon-red-bright); }
+.history-seal.slab-repaired { color: var(--turquoise-bright); }
+.history-seal.slab-guarded { color: var(--sun-bright); }
+/* The seal head: the stamp + tone word sit on one line; the supporting "why"
+   sits quietly beneath in muted ink so the colour-keyed stamp still leads. */
+.history-seal-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+.history-seal-stamp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  background: rgba(0, 0, 0, 0.4);
+  border: var(--px) solid #00000080;
+  box-shadow: inset 0 var(--px) 0 rgba(0, 0, 0, 0.6);
+}
+.history-seal-stamp .mark { fill: currentColor; }
+.history-seal-word {
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: currentColor;
+  text-shadow: 0 var(--px) 0 rgba(0, 0, 0, 0.7);
+}
+/* The one-line "why": the real diagnosis drawn from the run summary. It is only
+   rendered on a FOCUSED entry (the selected row, or the single most-recent run),
+   so it carries the full evidence of that decision rather than repeating down the
+   whole column. Bright sand ink at 13px over the near-opaque seal background to
+   clear the 4.5:1 contrast floor comfortably. Clamp to two lines so a long reason
+   never bloats the row. */
+.history-seal-why {
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
+  color: var(--sand);
+  text-shadow: 0 var(--px) 0 rgba(0, 0, 0, 0.7);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* The selected row presses its seal deeper into the stone and lets the full
+   "why" breathe — the expanded treatment that still reads richer than rest. */
+.ledger-row.active .history-seal {
+  padding: var(--s2) var(--s3);
+  /* Near-opaque ink-well so the bright-sand "why" sits on a dependable dark
+     ground — guarantees the contrast floor regardless of the row tone beneath. */
+  background: rgba(0, 0, 0, 0.62);
+  border-left-width: 4px;
+  box-shadow:
+    inset 0 var(--px) 0 rgba(255, 240, 210, 0.14),
+    inset 0 calc(-1 * var(--px)) 0 rgba(0, 0, 0, 0.55);
+  /* one-shot press: the seal stamps DOWN into the ledger stone as it's selected. */
+  animation: seal-press 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+.ledger-row.active .history-seal-stamp {
+  width: 22px;
+  height: 22px;
+}
+.ledger-row.active .history-seal-why {
+  -webkit-line-clamp: unset;
+  color: var(--sand);
+}
+/* The seal "presses into" the stone: it drops in from slightly above with a
+   brief over-shoot and a flash of light on the engraving, then settles flush. */
+@keyframes seal-press {
+  0% { transform: translateY(-7px) scale(1.05); opacity: 0; }
+  55% { transform: translateY(1px) scale(0.985); opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
 }
 
 /* ---- Populated run layout: the canyon STRUCTURES the view ----------------
@@ -807,7 +1052,25 @@ button.secondary {
   display: flex;
   flex-direction: column;
   gap: 0; /* layers stack flush like real strata */
+  position: relative;
 }
+/* A single UNIFYING sandstone grain washed across the whole run column — the
+   same faint fleck the field tablets wear — so the strata read as one authored,
+   quarried face rather than eight separately-textured bars. One overlay for the
+   column (not per-row) keeps the texture calm and cohesive with the sidebar.
+   Very low alpha; sits above the rock fills but below row content + edges. */
+.canyon::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(var(--parchment-grain) 1px, transparent 1px) 0 0 / 6px 6px,
+    radial-gradient(var(--parchment-grain) 1px, transparent 1px) 3px 3px / 6px 6px;
+}
+/* Keep row content + the active scan above the unifying grain wash. */
+.canyon > * { position: relative; z-index: 2; }
 .strata-empty {
   padding: var(--s4);
 }
@@ -822,9 +1085,13 @@ button.secondary {
   padding: var(--s3) var(--s4) var(--s3) 0;
   color: var(--ink);
   cursor: default;
-  /* chiseled top-lit / bottom-shadow edges between layers */
-  box-shadow: inset 0 var(--px) 0 rgba(255, 240, 210, 0.22),
-    inset 0 calc(-1 * var(--px)) 0 rgba(0, 0, 0, 0.35);
+  /* Chiseled top-lit / bottom-shadow edges between layers — kept SOFT so the
+     stacked strata read as one continuous authored cliff face rather than eight
+     hard-edged bars. The depth/colour sequence still carries the geology; this
+     just lowers the per-row edge noise so the column feels as composed as the
+     carved sidebar tablets. (Regression rows below re-assert a hard fault edge.) */
+  box-shadow: inset 0 var(--px) 0 rgba(255, 240, 210, 0.12),
+    inset 0 calc(-1 * var(--px)) 0 rgba(0, 0, 0, 0.22);
   overflow: hidden;
 }
 /* When the row is a real <button>, strip the key-cap button chrome so it still
@@ -917,7 +1184,7 @@ button.secondary {
   filter: brightness(1.06);
 }
 .strata.clickable:focus-visible {
-  outline: var(--px) dashed var(--sand);
+  outline: calc(2 * var(--px)) solid var(--sun);
   outline-offset: calc(-2 * var(--px));
 }
 .strata .stage {
@@ -1132,16 +1399,77 @@ button.secondary {
   flex-direction: column;
   gap: var(--s4);
 }
-.proj select {
+/* The project dial: an etched caption + a carved slot the native <select> is
+   recessed into, with a struck chevron stamp on the right. The <select> itself
+   stays native (accessible) but is skinned to vanish into the stone slot. */
+.proj {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+}
+.proj-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--sand-dim);
+  text-shadow: 0 var(--px) 0 var(--engrave);
+}
+/* The project DIAL: a carved warm-stone frame (sandstone fleck + sunlit top lip,
+   matching .tablet / the diff block) seated with a recessed select well, so the
+   project picker reads as a struck stone dial — not a generic dark dropdown. The
+   native <select> keeps its role/label; only the chrome is skinned. */
+.proj-slot {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  background:
+    radial-gradient(var(--parchment-grain) 1px, transparent 1px) 0 0 / 6px 6px,
+    radial-gradient(var(--parchment-grain) 1px, transparent 1px) 3px 3px / 6px 6px,
+    linear-gradient(180deg, var(--tablet-face), var(--tablet-face-2));
+  border: var(--px) solid var(--tablet-base);
+  box-shadow:
+    inset 0 var(--px) 0 var(--tablet-lip),
+    inset 0 calc(-1 * var(--px)) 0 var(--engrave),
+    0 var(--px) 0 var(--tablet-base);
+}
+.proj-slot select {
+  appearance: none;
+  -webkit-appearance: none;
   font-family: var(--mono);
   font-size: var(--t-xs);
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
   color: var(--sand);
-  background: var(--night-3);
-  border: var(--px) solid var(--rim);
+  background: transparent;
+  border: 0;
   border-radius: 0;
-  padding: var(--s2) var(--s3);
+  padding: var(--s2) calc(var(--s5) + var(--s1)) var(--s2) var(--s3);
+  cursor: pointer;
+}
+.proj-slot select:focus-visible {
+  outline: calc(2 * var(--px)) solid var(--sun);
+  outline-offset: 2px;
+}
+/* native option list reverts to dark stone so it stays legible when opened */
+.proj-slot option {
+  background: var(--night-2);
+  color: var(--sand);
+}
+.proj-chev {
+  position: absolute;
+  right: var(--s2);
+  font-size: var(--t-xs);
+  color: var(--sun);
+  pointer-events: none;
+}
+.proj-slot:focus-within {
+  border-color: var(--sun);
+  box-shadow:
+    inset 0 var(--px) 0 #fff0cf,
+    inset 0 calc(-1 * var(--px)) 0 var(--engrave),
+    0 0 8px rgba(255, 207, 94, 0.28);
 }
 /* ---- Story form: a carved field slate / notebook ------------------------
    The form reads as a slate tablet pressed into the field log: each field is a
@@ -1165,13 +1493,42 @@ button.secondary {
   flex-direction: column;
   gap: var(--s1);
 }
+/* The label reads as a chiseled caption struck into the slate: a tiny sunlit
+   tick precedes the engraved text, and a hairline rule runs out to the right so
+   each field is announced like a survey-journal entry, not a bare HTML label. */
 .slate-label {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
   font-family: var(--mono);
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.14em;
   color: var(--sand-dim);
   text-shadow: 0 var(--px) 0 var(--engrave);
+}
+.slate-label::before {
+  content: '';
+  width: var(--s2);
+  height: var(--px);
+  flex: none;
+  background: var(--tablet-lip);
+  box-shadow: 0 var(--px) 0 var(--engrave);
+}
+.slate-label::after {
+  content: '';
+  flex: 1;
+  height: var(--px);
+  background: linear-gradient(90deg, var(--engrave), transparent);
+}
+/* The whole field warms when focused-within: the caption lifts to sun so the
+   active slot is unmistakable while typing (responsive form feedback). */
+.slate-field:focus-within .slate-label {
+  color: var(--sun);
+}
+.slate-field:focus-within .slate-label::before {
+  background: var(--sun);
+  box-shadow: 0 0 6px var(--sun);
 }
 /* A CARVED SLOT etched into the field tablet: a deep dark well sunk into the
    slate, the chisel biting in from the top (shadowed inner top edge) and the
@@ -1198,7 +1555,9 @@ button.secondary {
   color: var(--sand-dim);
 }
 /* Focus LIGHTS the slot's edge — the freshly-struck groove warms to sun while
-   the visible dashed focus ring is preserved for keyboard a11y. */
+   the visible dashed focus ring is preserved for keyboard a11y. A brief one-shot
+   "edge-light" pulse runs as focus lands so the chisel reads as freshly struck
+   (the groove deepens + the sunlit base lip flares, then settles). */
 .story-input:focus {
   border-color: var(--sun);
   box-shadow:
@@ -1206,9 +1565,32 @@ button.secondary {
     inset var(--px) 0 0 var(--slot-top-shadow),
     inset 0 calc(-1 * var(--px)) 0 var(--sun),
     0 0 0 var(--px) rgba(255, 207, 94, 0.28);
+  animation: slot-strike 0.4s ease-out;
 }
+/* The freshly-struck groove: the sunlit base lip + ring flare brighter for a
+   beat as focus lands, then settle to the static lit focus state above. */
+@keyframes slot-strike {
+  0% {
+    box-shadow:
+      inset 0 calc(2 * var(--px)) var(--px) var(--slot-top-shadow),
+      inset var(--px) 0 0 var(--slot-top-shadow),
+      inset 0 calc(-1 * var(--px)) 0 var(--sun),
+      0 0 0 var(--px) rgba(255, 207, 94, 0.28);
+  }
+  40% {
+    box-shadow:
+      inset 0 calc(3 * var(--px)) calc(2 * var(--px)) var(--slot-top-shadow),
+      inset var(--px) 0 0 var(--slot-top-shadow),
+      inset 0 calc(-2 * var(--px)) 0 var(--sun-bright),
+      0 0 0 calc(2 * var(--px)) rgba(255, 207, 94, 0.42);
+  }
+}
+/* A STATIC keyboard focus ring that does NOT depend on the slot-strike pulse:
+   under prefers-reduced-motion the animated edge-light is suppressed, but this
+   solid dashed outline always marks the focused field. Kept at 2px so it reads
+   on its own as the sole focus cue when motion is off. */
 .story-input:focus-visible {
-  outline: var(--px) dashed var(--sun);
+  outline: calc(2 * var(--px)) solid var(--sun);
   outline-offset: 2px;
 }
 /* The field-note leaf: the carved slot wears faint ruled lines like a notebook
@@ -1242,6 +1624,37 @@ button.secondary {
   box-shadow:
     0 var(--px) 0 #6e4410, var(--px) 0 0 #6e4410, calc(-1 * var(--px)) 0 0 #6e4410,
     inset 0 var(--px) 0 var(--sun-bright);
+}
+/* Submit confirm: the instant a story is dispatched the slate flashes a quick
+   sunlit acknowledgement — the inset edges warm to sun, then settle. One-shot,
+   driven by the .just-sent class App sets for ~700ms after upload. The dispatch
+   key-cap also flares so the commit is felt, not just the label change. */
+.story-form.slate.just-sent {
+  animation: slate-confirm 0.6s ease-out;
+}
+.story-form.slate.just-sent .dispatch-btn {
+  animation: dispatch-confirm 0.6s ease-out;
+}
+@keyframes slate-confirm {
+  0% {
+    box-shadow:
+      inset 0 var(--px) 0 var(--engrave),
+      inset 0 calc(-1 * var(--px)) 0 var(--slate-lip);
+  }
+  35% {
+    box-shadow:
+      inset 0 0 0 var(--px) rgba(255, 207, 94, 0.5),
+      inset 0 var(--px) 0 var(--sun),
+      inset 0 calc(-1 * var(--px)) 0 var(--sun-bright);
+  }
+}
+@keyframes dispatch-confirm {
+  35% {
+    filter: brightness(1.18);
+    box-shadow:
+      0 var(--px) 0 #6e4410, var(--px) 0 0 #6e4410, calc(-1 * var(--px)) 0 0 #6e4410,
+      inset 0 var(--px) 0 var(--sun-bright), 0 0 10px rgba(255, 207, 94, 0.55);
+  }
 }
 .storylist {
   list-style: none;
@@ -1347,18 +1760,25 @@ button.secondary {
 }
 .viewtabs button {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
   font-family: var(--mono);
   font-size: var(--t-xs);
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--sand-dim);
-  /* a recessed inactive stone stop */
-  background: linear-gradient(180deg, var(--tablet-face), var(--tablet-face-2));
+  /* a recessed inactive stone stop — same carved warm-stone face + sandstone
+     fleck as .tablet / the diff block, with a sunlit top lip + shadowed base. */
+  background:
+    radial-gradient(var(--parchment-grain) 1px, transparent 1px) 0 0 / 6px 6px,
+    radial-gradient(var(--parchment-grain) 1px, transparent 1px) 3px 3px / 6px 6px,
+    linear-gradient(180deg, var(--tablet-face), var(--tablet-face-2));
   border: var(--px) solid var(--tablet-base);
   border-radius: 0;
   box-shadow:
-    inset 0 var(--px) 0 rgba(246, 236, 216, 0.1),
+    inset 0 var(--px) 0 var(--tablet-lip),
     inset 0 calc(-1 * var(--px)) 0 var(--engrave);
   padding: var(--s2) var(--s4);
   text-shadow: 0 var(--px) 0 var(--engrave);
@@ -1367,20 +1787,83 @@ button.secondary {
   filter: brightness(1.12);
   color: var(--sand);
 }
-/* The struck-gold active sign — same chiseled key-cap family as the buttons. */
+/* The struck-gold active sign — a freshly-struck, sunlit stone: a warm gold face
+   with a bright lit top lip + a faint sun-glow halo so it reads as the lit stop. */
 .viewtabs button.active {
   color: var(--ink);
-  background: var(--sun);
+  background:
+    radial-gradient(rgba(255, 255, 255, 0.14) 1px, transparent 1px) 0 0 / 6px 6px,
+    linear-gradient(180deg, var(--sun-bright), var(--sun));
   border-color: #8a5a16;
   text-shadow: none;
   box-shadow:
-    inset 0 var(--px) 0 var(--sun-bright),
-    inset 0 calc(-1 * var(--px)) 0 #6e4410;
+    inset 0 var(--px) 0 #fff0cf,
+    inset 0 calc(-1 * var(--px)) 0 #6e4410,
+    0 0 10px rgba(255, 207, 94, 0.32);
 }
 .viewtabs button:focus-visible {
-  outline: var(--px) dashed var(--sand);
-  outline-offset: var(--px);
+  outline: calc(2 * var(--px)) solid var(--sun);
+  outline-offset: calc(2 * var(--px));
   z-index: 1;
+}
+
+/* Ambient liveness LED on the LIVE tab: a square pixel beacon that reads as a
+   lit indicator even in a STILL frame (it is filled + glowing at rest), and
+   gently breathes when the stream is open. Shape-coded like the .dot family so
+   it is not colour-only. */
+.tab-live-led {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border: var(--px) solid #00000066;
+  background: var(--sand-dim);
+  box-shadow: inset 0 0 0 var(--px) rgba(0, 0, 0, 0.3);
+}
+.tab-live-led.open {
+  background: var(--turquoise);
+  box-shadow: 0 0 6px var(--turquoise);
+  animation: led-breathe 2.2s ease-in-out infinite;
+}
+.tab-live-led.connecting {
+  background: transparent;
+  border-color: var(--sun);
+  box-shadow: inset 0 0 0 var(--px) var(--sun);
+}
+.tab-live-led.closed {
+  background: var(--canyon-red);
+  transform: rotate(45deg);
+}
+/* On the lit (active) gold tab the open LED stays teal but reads on gold. */
+.viewtabs button.active .tab-live-led.open {
+  box-shadow: 0 0 6px var(--turquoise), 0 0 0 var(--px) rgba(0, 0, 0, 0.35);
+}
+@keyframes led-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 4px var(--turquoise);
+  }
+  50% {
+    box-shadow: 0 0 9px var(--turquoise);
+  }
+}
+
+/* The run-demo "ignition" stamp: the primary struck-gold action seated in the
+   rim console. Same chiseled key-cap family as the buttons, but a touch taller
+   and wider-tracked so it reads as the hardware you press to start a descent. */
+.run-demo-btn {
+  align-self: stretch;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  padding: var(--s2) var(--s4);
+  box-shadow:
+    0 var(--px) 0 #6e4410,
+    var(--px) 0 0 #6e4410,
+    calc(-1 * var(--px)) 0 0 #6e4410,
+    inset 0 var(--px) 0 var(--sun-bright);
+}
+.run-demo-btn:disabled {
+  /* keep the carved look while running, just dimmed, not flattened */
+  background: linear-gradient(180deg, var(--sun), #d9a843);
 }
 
 /* ---- Living docs view: a field survey-journal of carved flow tablets -----
@@ -1775,11 +2258,34 @@ button.secondary {
   overflow: auto;
   max-height: 320px;
 }
-.evidence pre .add {
+.evidence pre .add,
+.judgment-diff .add {
   color: var(--turquoise-bright);
 }
-.evidence pre .del {
+.evidence pre .del,
+.judgment-diff .del {
   color: var(--canyon-red-bright);
+}
+/* Added / removed lines carry a faint teal / rust sediment wash + a keyed gutter
+   rule inside the carved diff leaf, so the change reads as a strata of edits —
+   teal sediment for additions, rust for removals — while the bright ink keeps
+   the code well above 4.5:1. The keyed rule sits out in the left margin (negative
+   inset) so the gutter doubles as a +/- color spine. (The plain evidence <pre>
+   diff stays unwashed.) */
+.judgment-diff .add,
+.judgment-diff .del {
+  display: block;
+  margin-left: calc(-1 * var(--s3));
+  padding-left: calc(var(--s3) - var(--px));
+  border-left: var(--px) solid transparent;
+}
+.judgment-diff .add {
+  background: rgba(47, 168, 154, 0.1);
+  border-left-color: var(--turquoise);
+}
+.judgment-diff .del {
+  background: rgba(217, 73, 47, 0.1);
+  border-left-color: var(--canyon-red);
 }
 .reason {
   color: var(--sand);
@@ -1926,7 +2432,11 @@ button.secondary {
   align-items: center;
   gap: var(--s4);
   padding: var(--s4) var(--s4) var(--s4) var(--s5);
-  background: linear-gradient(180deg, var(--strata-7) 0%, var(--strata-8) 100%);
+  /* A dusk wash over the warm strata so the carved-stone tone stays but the
+     large color-keyed seal text clears 4.5:1 even over the lighter top band. */
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0.34)),
+    linear-gradient(180deg, var(--strata-7) 0%, var(--strata-8) 100%);
   border-top: var(--px) solid #00000080;
   box-shadow: inset 0 var(--px) 0 rgba(255, 240, 210, 0.18);
   overflow: hidden;
@@ -2000,6 +2510,26 @@ button.secondary {
   letter-spacing: 0.18em;
   color: var(--sand-dim);
 }
+/* The LARGE stamped seal phrase — the unmissable, color-keyed verdict line
+   pressed into the bedrock. Bigger + bolder than any other text in the view. */
+.slab-seal {
+  font-family: var(--mono);
+  font-size: clamp(18px, 3.2vw, 26px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.7);
+}
+.slab-error .slab-seal {
+  color: var(--canyon-red-bright);
+}
+.slab-repaired .slab-seal {
+  color: var(--turquoise-bright);
+}
+.slab-guarded .slab-seal {
+  color: var(--sun-bright);
+}
 .slab-headline {
   font-family: var(--mono);
   font-size: var(--t-lg);
@@ -2008,6 +2538,15 @@ button.secondary {
   text-transform: uppercase;
   color: var(--sand);
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+}
+/* the prose headline now sits inline as a small supporting phrase under the seal */
+.slab-headline-inline {
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sand);
 }
 .slab-detail {
   display: flex;
@@ -2018,6 +2557,324 @@ button.secondary {
 .slab-note {
   color: var(--sand-dim);
   font-size: var(--t-sm);
+}
+
+/* ---- Judgment ledger: the verdict's evidence, surfaced at the floor ------
+   Sits flush under the bedrock slab and lays the two contrasting calls (safe
+   drift -> repaired, real regression -> refused) side by side with their REAL
+   reasoning + before/after proof + proposed diff. This is the dramatic, legible
+   heart of the decision moment — the judgment WITH its evidence, not buried in
+   collapsible strata. A carved cut-stone shelf below the slab. */
+.ledger {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--s3);
+  padding: var(--s4) var(--s4) var(--s4) var(--s5);
+  background: linear-gradient(180deg, var(--strata-8) 0%, #0d1217 100%);
+  border-top: var(--px) solid #00000080;
+  box-shadow: inset 0 var(--px) 0 rgba(255, 240, 210, 0.06);
+}
+/* A chiseled binding rail down the left edge ties the shelf to the slab above. */
+.ledger-rail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 5px;
+  background: repeating-linear-gradient(
+    180deg,
+    var(--strata-3) 0 7px,
+    var(--strata-6) 7px 14px
+  );
+  opacity: 0.7;
+}
+/* One judgment card: a carved evidence slip. The left edge is keyed to the call
+   (turquoise = repaired/safe, red = refused/regression) so the verdict reads at
+   a glance even before the text. */
+.judgment {
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s3);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0.4));
+  border: var(--px) solid var(--tablet-base);
+  border-left: 4px solid var(--rim);
+  box-shadow:
+    inset 0 var(--px) 0 rgba(246, 236, 216, 0.08),
+    inset 0 calc(-1 * var(--px)) 0 var(--engrave);
+}
+.judgment-repaired {
+  border-left-color: var(--turquoise);
+}
+.judgment-refused {
+  border-left-color: var(--canyon-red);
+}
+.judgment-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  flex-wrap: wrap;
+}
+.judgment-arrow {
+  color: var(--sand-dim);
+  font-size: var(--t-sm);
+}
+.judgment-verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+}
+.jv-repaired {
+  color: var(--turquoise-bright);
+}
+.jv-repaired .mark {
+  fill: var(--turquoise-bright);
+}
+.jv-refused {
+  color: var(--canyon-red-bright);
+}
+.jv-refused .mark {
+  fill: var(--canyon-red-bright);
+}
+.judgment-reason,
+.judgment-detail {
+  margin: 0;
+  font-size: var(--t-sm);
+  line-height: 1.5;
+  color: var(--sand);
+}
+.judgment-detail {
+  color: var(--sand-dim);
+  font-style: italic;
+}
+/* Before/after proof: two FIELD-JOURNAL PLATES — each real screenshot is set
+   into a carved stone mat under an etched caption bar (BEFORE / AFTER), so the
+   light product capture reads as a labelled survey plate pinned to the stone,
+   not a bare light rectangle floating in the dark. */
+.judgment-shots {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s3);
+  margin-top: var(--s2);
+}
+.judgment-shot {
+  margin: 0;
+  display: grid;
+  gap: 0;
+  background: linear-gradient(180deg, var(--strata-7) 0%, var(--strata-8) 100%);
+  border: var(--px) solid var(--tablet-base);
+  box-shadow:
+    inset 0 var(--px) 0 rgba(246, 236, 216, 0.1),
+    0 2px 0 rgba(0, 0, 0, 0.4);
+}
+/* Etched caption BAR across the top of each plate — a chiseled label strip with
+   a bold state tag (BEFORE / AFTER) and the run state, keyed by tone. */
+.judgment-shot .plate-cap {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+  padding: var(--s1) var(--s2);
+  /* dark dusk-stone strip so the color-keyed BEFORE/AFTER tag clears 4.5:1 */
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.46), rgba(0, 0, 0, 0.36));
+  border-bottom: var(--px) solid var(--tablet-base);
+  box-shadow: inset 0 calc(-1 * var(--px)) 0 rgba(0, 0, 0, 0.4);
+}
+.plate-tag {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  text-shadow: 0 var(--px) 0 var(--engrave);
+}
+.judgment-shot.is-before .plate-tag {
+  color: var(--canyon-red-bright);
+}
+.judgment-shot.is-after .plate-tag {
+  color: var(--turquoise-bright);
+}
+.plate-state {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--sand-dim);
+}
+/* The recessed stone mat the capture is pressed into. */
+.plate-mat {
+  display: block;
+  padding: var(--s2);
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.34), rgba(0, 0, 0, 0.5));
+  box-shadow: inset 0 var(--px) calc(2 * var(--px)) rgba(0, 0, 0, 0.55);
+}
+.judgment-shot img {
+  width: 100%;
+  height: auto;
+  min-height: 116px;
+  object-fit: cover;
+  display: block;
+  border: var(--px) solid var(--tablet-base);
+  box-shadow:
+    inset 0 0 0 var(--px) rgba(0, 0, 0, 0.5),
+    0 2px 0 rgba(0, 0, 0, 0.45);
+  background: #05080b;
+}
+/* The proposed-change DIFF reads as a carved field-journal artifact, not a
+   default dark terminal pane: a chiseled warm-stone frame (matching the field
+   tablets) wraps a stamped header band + the code leaf. The whole block is one
+   quarried slab so the diff belongs to the canyon world. */
+.judgment-diff-wrap {
+  margin-top: var(--s2);
+  border: var(--px) solid var(--tablet-base);
+  /* warm dusk-stone face with a faint sandstone fleck, sunlit top lip + shadow
+     base — the same carved vocabulary as .tablet / .ledger-row. */
+  background:
+    radial-gradient(var(--parchment-grain) 1px, transparent 1px) 0 0 / 6px 6px,
+    radial-gradient(var(--parchment-grain) 1px, transparent 1px) 3px 3px / 6px 6px,
+    linear-gradient(180deg, var(--tablet-face) 0%, var(--tablet-face-2) 100%);
+  box-shadow:
+    inset 0 var(--px) 0 var(--tablet-lip),
+    inset 0 calc(-1 * var(--px)) 0 var(--engrave),
+    0 var(--px) 0 var(--tablet-base);
+}
+/* Diff header: a stamped "PROPOSED CHANGE · DIFF" caption pressed into a recessed
+   engraving band, with a compact carved collapse stop on the right. */
+.judgment-diff-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+  padding: var(--s1) var(--s2);
+  /* recessed engraving strip: dark well with a lit bottom lip (matches .tablet-head) */
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.32), rgba(0, 0, 0, 0.12));
+  border-bottom: var(--px) solid var(--tablet-base);
+  box-shadow:
+    inset 0 var(--px) 0 var(--engrave),
+    inset 0 calc(-1 * var(--px)) 0 var(--tablet-lip);
+}
+.judgment-diff-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--sun);
+  text-shadow: 0 var(--px) 0 var(--engrave);
+}
+/* A small chiseled tick precedes the stamped caption so it reads as struck stone. */
+.judgment-diff-label::before {
+  content: '';
+  width: var(--s2);
+  height: var(--px);
+  flex: none;
+  background: var(--tablet-lip);
+  box-shadow: 0 var(--px) 0 var(--engrave);
+}
+.judgment-diff-toggle {
+  appearance: none;
+  background: var(--stamp-face);
+  border: var(--px) solid var(--tablet-base);
+  color: var(--sun);
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  letter-spacing: 0.06em;
+  padding: var(--s1) var(--s2);
+  cursor: pointer;
+  flex: none;
+  box-shadow: inset 0 var(--px) 0 var(--stamp-lit);
+}
+.judgment-diff-toggle:hover {
+  color: var(--sun-bright);
+  border-color: var(--rim);
+}
+.judgment-diff-toggle:focus-visible {
+  outline: calc(2 * var(--px)) solid var(--sun);
+  outline-offset: 2px;
+}
+/* The code leaf: a sediment-toned recessed page the diff is etched onto. Warm
+   dark stone ground (not flat near-black terminal) with a faint ruled gutter
+   line up the left so it reads as a field-journal leaf; monospace + the existing
+   teal/rust syntax keep it perfectly legible as code (sand ink clears 4.5:1). */
+.judgment-diff {
+  margin: 0;
+  max-height: 220px;
+  overflow: auto;
+  padding: var(--s2) var(--s2) var(--s2) var(--s4);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--sand);
+  /* warm sediment ground: a deep stone wash (not flat near-black terminal) the
+     diff is etched onto. Added / removed lines below carry their own teal / rust
+     keyed gutter spine. */
+  background: linear-gradient(180deg, #221a14 0%, #1a1410 100%);
+  border: var(--px) solid var(--tablet-base);
+  border-top: 0;
+  box-shadow: inset 0 calc(2 * var(--px)) var(--px) var(--slot-top-shadow);
+}
+/* Mobile: the ledger stacks to ONE column AND the before/after plate pair inside
+   each card also stacks to a single column, so each plate gets the card's full
+   width and stays legible at 375 (the old 2-up grid rendered them cramped). */
+@media (max-width: 560px) {
+  .ledger {
+    grid-template-columns: 1fr;
+    padding: var(--s3) var(--s3) var(--s3) var(--s4);
+  }
+  .judgment-shots {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- Carved empty / error states ---------------------------------------
+   The non-happy states (no expeditions logged, no stories, a load error) read
+   as an intentional CARVED placeholder — a recessed engraved stone slip with a
+   sunlit top lip + shadow base, a stamped mono caption, and a quiet supporting
+   line — never a bare default sentence. One shared treatment, tone-keyed by an
+   optional modifier (error = rust edge). Static; no animation. */
+.carved-empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  margin: var(--s2) 0 0;
+  padding: var(--s3);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.14));
+  border: var(--px) solid var(--tablet-base);
+  border-left: 3px solid var(--tablet-lip);
+  box-shadow:
+    inset 0 var(--px) 0 rgba(246, 236, 216, 0.09),
+    inset 0 calc(-1 * var(--px)) 0 var(--engrave);
+}
+.carved-empty .carved-empty-head {
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sun);
+  text-shadow: 0 var(--px) 0 var(--engrave);
+}
+.carved-empty .carved-empty-sub {
+  font-family: var(--sans);
+  font-size: var(--t-sm);
+  line-height: 1.4;
+  color: var(--sand-dim);
+}
+/* Error tone: a rust binding spine + rust caption so a failed load reads as a
+   distinct (but still carved) state, not the calm "nothing here yet" one. */
+.carved-empty.is-error {
+  border-left-color: #7a2a1f;
+}
+.carved-empty.is-error .carved-empty-head {
+  color: var(--canyon-red-bright);
 }
 
 /* ---- Loading skeleton --------------------------------------------------- */
@@ -2445,17 +3302,47 @@ button.secondary {
 .run-complete .slab {
   animation: slab-carve 0.9s ease-out both;
 }
-.run-complete .slab-headline {
+.run-complete .slab-seal {
   animation: slab-light 1.4s ease-out both;
 }
+/* The recessed stamp presses INTO the bedrock as the run finalizes: it drops in
+   from above with a brief over-shoot and a flash of light catching the carved
+   rim, then seats flush. One-shot, transform/opacity/box-shadow only. */
+.run-complete .slab-stamp {
+  animation: stamp-press 0.7s cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
+  animation-delay: 0.35s;
+}
+@keyframes stamp-press {
+  0% {
+    transform: translateY(-12px) scale(1.12);
+    opacity: 0;
+  }
+  55% {
+    transform: translateY(2px) scale(0.96);
+    opacity: 1;
+    box-shadow:
+      inset 0 var(--px) 0 rgba(0, 0, 0, 0.6),
+      inset 0 calc(-1 * var(--px)) 0 rgba(255, 240, 210, 0.12),
+      0 0 18px 2px currentColor;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+/* Tone the press flash to the verdict colour so the stamp lands rust/teal/gold. */
+.run-complete.slab-error .slab-stamp,
+.run-complete .slab-error .slab-stamp { color: var(--canyon-red); }
+.run-complete .slab-repaired .slab-stamp { color: var(--turquoise); }
+.run-complete .slab-guarded .slab-stamp { color: var(--sun); }
 @keyframes slab-carve {
   from { transform: translateY(10px); opacity: 0.2; clip-path: inset(0 0 100% 0); }
   to { transform: translateY(0); opacity: 1; clip-path: inset(0 0 0 0); }
 }
 @keyframes slab-light {
-  0% { text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6); }
-  30% { text-shadow: 0 0 18px var(--sun-bright), 0 1px 0 rgba(0, 0, 0, 0.6); }
-  100% { text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6); }
+  0% { text-shadow: 0 2px 0 rgba(0, 0, 0, 0.7); }
+  30% { text-shadow: 0 0 22px currentColor, 0 2px 0 rgba(0, 0, 0, 0.7); }
+  100% { text-shadow: 0 2px 0 rgba(0, 0, 0, 0.7); }
 }
 /* Keyed glow on the slab's mineral edge so pass/repair/regression each land
    with their own colour pulse. */
@@ -2474,384 +3361,23 @@ button.secondary {
   0%, 100% { box-shadow: none; }
   40% { box-shadow: 0 0 16px 2px var(--sun); }
 }
-
-/* ============================================================================
-   CANYON GORGE — the full-viewport FIXED backdrop. The whole app sits INSIDE a
-   gorge: a sky-strip rim overhead, two towering layered rock WALLS rising on the
-   far left + right edges (filling the side margins with hoodoos, an arch,
-   buttes, ledges, boulders and juniper), and a dramatic flowing RIVER along the
-   floor. It lives behind .app (z 0); content panels stay opaque on top, so
-   legibility never depends on it. No horizontal scrollbar (walls are clipped to
-   the viewport). All motion here is gated by prefers-reduced-motion below.
-   ========================================================================== */
-.gorge {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden; /* clip drifting clouds / mirrored walls — no h-scroll */
-  pointer-events: none;
+/* The evidence shelf settles in just after the slab carves, so the eye lands on
+   the verdict first, then its proof. The two calls stagger for a beat of life. */
+.run-complete .judgment {
+  animation: ledger-settle 0.7s ease-out both;
 }
-
-/* Sky strip: the rim opening overhead. A bright sky gradient with drifting
-   clouds and a distant butte range. Sits behind the walls; tall enough that the
-   carved wall SKYLINE (mesas, spires, arch, balanced rock) silhouettes against
-   open sky before the rock body fills the rest of the frame. */
-.gorge-sky {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 42%;
-  min-height: 280px;
-  background: linear-gradient(180deg, var(--sky-1) 0%, var(--sky-2) 64%, var(--sky-3) 100%);
-}
-.gorge-clouds {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-}
-.gorge-cloud {
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  background: rgba(255, 252, 244, 0.9);
-  box-shadow:
-    12px 0 0 rgba(255, 252, 244, 0.9), 24px 0 0 rgba(255, 252, 244, 0.9),
-    36px 0 0 rgba(255, 252, 244, 0.9), 12px -12px 0 rgba(255, 252, 244, 0.9),
-    24px -12px 0 rgba(255, 252, 244, 0.9);
-  image-rendering: pixelated;
-}
-.gc-1 { top: 22%; transform: scale(1.1); animation: gorge-cloud 120s linear infinite; }
-.gc-2 { top: 46%; opacity: 0.8; transform: scale(0.8); animation: gorge-cloud 170s linear infinite; animation-delay: -60s; }
-.gc-3 { top: 10%; opacity: 0.7; transform: scale(1.4); animation: gorge-cloud 220s linear infinite; animation-delay: -130s; }
-@keyframes gorge-cloud {
-  from { left: -14%; }
-  to { left: 114%; }
-}
-/* Distant butte range on the far horizon (palest parallax layer). */
-.gorge-horizon {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100%;
-  height: 62px;
-}
-.gorge-horizon-far {
-  fill: var(--sky-shadow);
-  opacity: 0.34;
-}
-
-/* The two towering walls. Each is a column pinned to its edge spanning the full
-   viewport height. The right wall is the left, mirrored. They are WIDE enough to
-   read as real cliffs and to fill the side margins on wide screens. The SVG is
-   drawn full-bleed with the carved SKYLINE pinned to the top, so the mesas,
-   spires, arch and balanced rock silhouette against the sky strip behind. */
-.gorge-wall {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  /* The wall column is WIDE on desktop so the signature skyline fills the open
-     side margin (it tucks a little behind the content panel at its inner edge,
-     but the formation-rich OUTER band stays in the clear). */
-  width: clamp(220px, 23vw, 380px);
-  overflow: hidden;
-}
-.gorge-wall-left { left: 0; }
-.gorge-wall-right { right: 0; transform: scaleX(-1); }
-.canyon-wall-svg {
-  position: absolute;
-  inset: 0;
-  /* Anchored to the outer edge. The signature skyline (mesa, hoodoo spires,
-     sky-through arch, balanced rock — all clustered in the outer 0–214 band of
-     the viewBox) lands in the VISIBLE margin against the sky; the plain inner
-     step-buttes (past x=214) recede behind the content. The slight over-width
-     keeps the formations boldly scaled while still revealing the arch. */
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 118%;
-  height: 100%;
-  /* a long shadow cast from the cliff into the gorge so it reads as a wall */
-  filter: drop-shadow(7px 0 12px rgba(0, 0, 0, 0.45));
-}
-.gorge-wall-right .canyon-wall-svg {
-  /* mirrored wall: keep its outer (now right) edge anchored so the skyline still
-     sits against the open margin after the scaleX(-1) flip on the column. */
-  left: 0;
-}
-
-/* ---- Wall formation styling ------------------------------------------- */
-/* Receding far wall: hazed, paler, set behind for canyon depth. */
-.wall-far-body { opacity: 0.92; }
-.wall-far-haze { opacity: 1; }
-
-.wall-strata rect { fill: rgba(0, 0, 0, 0.14); }
-.wall-ledges polygon { fill: rgba(0, 0, 0, 0.36); }
-.wall-ledge-lip rect { fill: rgba(255, 240, 210, 0.34); }
-.wall-runnels rect { fill: rgba(0, 0, 0, 0.22); }
-
-/* THE GUARDIAN MESA — tall flat-topped caprock at the outer edge. */
-.mesa-body { fill: #d9b07a; }
-.mesa-cap { fill: #f0e0bd; }
-.mesa-shadow { fill: rgba(0, 0, 0, 0.28); }
-
-/* THE SENTINEL SPIRES — tapered hoodoo spires with bulbous caps + a waist band. */
-.spire { fill: #cf7b46; stroke: rgba(0, 0, 0, 0.3); stroke-width: 1; }
-.spire-cap { fill: #e0a96d; stroke: rgba(0, 0, 0, 0.28); stroke-width: 1; }
-.spire-cap2 { fill: #d98a4f; stroke: rgba(0, 0, 0, 0.24); stroke-width: 1; }
-
-/* SKYBRIDGE ARCH — the void is the page sky showing through the opening. */
-.arch-mass { fill: #b15833; }
-.arch-rim { fill: rgba(255, 240, 210, 0.42); }
-.arch-inner { fill: rgba(0, 0, 0, 0.3); }
-
-/* BALANCED ROCK — a boulder perched on a slender neck. */
-.balanced-neck { fill: #9a4a2e; }
-.balanced-cap { fill: #c66a40; stroke: rgba(0, 0, 0, 0.3); stroke-width: 1; }
-.balanced-shadow { fill: rgba(0, 0, 0, 0.22); }
-
-/* THE STEP BUTTES — descending mesas stepping into the gorge. */
-.butte-body { fill: #b9502f; }
-.butte-cap { fill: #e0a96d; }
-
-.boulder { fill: #6e3a2c; stroke: rgba(0, 0, 0, 0.4); stroke-width: 1; }
-.boulder-sm { fill: #7c3a2e; stroke: rgba(0, 0, 0, 0.4); stroke-width: 1; }
-
-.wall-juniper circle { fill: var(--green-juniper); opacity: 0.92; }
-
-/* ---- The dramatic river at the canyon FLOOR (the showpiece) ----------- */
-.gorge-river {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: clamp(96px, 17vh, 188px);
-  overflow: hidden;
-  /* the channel: a sunlit shallow surface deepening to a dark central channel */
-  background:
-    linear-gradient(180deg,
-      rgba(220, 255, 250, 0.32) 0%,
-      var(--river-bright) 10%,
-      var(--river) 34%,
-      var(--turquoise-deep) 64%,
-      var(--river-deep) 100%);
-  box-shadow:
-    inset 0 4px 0 rgba(220, 255, 250, 0.5),
-    inset 0 -10px 18px rgba(0, 0, 0, 0.5);
-}
-/* Sloped SHORELINE banks where the canyon walls descend into the water — a wet
-   dark rock margin that grounds the river between the cliffs. */
-.river-bank {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: clamp(60px, 14vw, 200px);
-  pointer-events: none;
-}
-.river-bank-left {
-  left: 0;
-  background: linear-gradient(90deg, rgba(40, 26, 20, 0.85) 0%, rgba(86, 47, 44, 0.4) 40%, transparent 100%);
-  clip-path: polygon(0 0, 100% 0, 60% 100%, 0 100%);
-}
-.river-bank-right {
-  right: 0;
-  background: linear-gradient(270deg, rgba(40, 26, 20, 0.85) 0%, rgba(86, 47, 44, 0.4) 40%, transparent 100%);
-  clip-path: polygon(0 0, 100% 0, 100% 100%, 40% 100%);
-}
-/* A WATERFALL spilling down the left wall into the river — a bright falling
-   column of water with rising mist and a churned plunge pool. */
-.river-fall {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  /* Spill the waterfall into the OPEN, visible left river band (the canyon margin
-     beside the content), not behind the sidebar panel. On wide screens this is
-     pulled well inboard of the outer cliff so it plunges into clear water. */
-  left: clamp(34px, 7vw, 132px);
-  width: clamp(18px, 2.4vw, 36px);
-  background: linear-gradient(180deg,
-    rgba(235, 255, 252, 0.95) 0%,
-    rgba(120, 226, 211, 0.85) 45%,
-    rgba(73, 197, 180, 0.6) 100%);
-  box-shadow: 0 0 10px rgba(220, 255, 250, 0.5);
-  /* the falling streaks */
-  background-size: 100% 26px;
-  animation: gorge-fall 0.9s linear infinite;
-}
-@keyframes gorge-fall {
-  from { background-position: 0 0; }
-  to { background-position: 0 26px; }
-}
-.fall-mist {
-  position: absolute;
-  bottom: 8%;
-  left: 50%;
-  width: 46px;
-  height: 30px;
-  margin-left: -23px;
-  background: radial-gradient(60% 70% at 50% 100%, rgba(255, 255, 255, 0.7) 0%, rgba(220, 255, 250, 0.25) 55%, transparent 78%);
-  mix-blend-mode: screen;
-  animation: gorge-mist 3.2s ease-in-out infinite;
-}
-@keyframes gorge-mist {
-  0%, 100% { transform: scale(1); opacity: 0.7; }
-  50% { transform: scale(1.25); opacity: 1; }
-}
-.fall-pool {
-  position: absolute;
-  bottom: 4%;
-  left: 50%;
-  width: 60px;
-  height: 12px;
-  margin-left: -30px;
-  background: radial-gradient(50% 100% at 50% 50%, rgba(255, 255, 255, 0.55) 0%, transparent 72%);
-  mix-blend-mode: screen;
-}
-/* Sky reflection sheen pooling near the surface. */
-.river-reflect {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 40%;
-  background: linear-gradient(180deg, rgba(188, 217, 230, 0.5) 0%, transparent 100%);
-  mix-blend-mode: screen;
-}
-/* The flowing current — banded teal texture scrolling sideways. */
-.river-current {
-  position: absolute;
-  inset: 0;
-  background: repeating-linear-gradient(
-    74deg,
-    var(--river) 0 9px,
-    var(--river-bright) 9px 13px,
-    var(--river) 13px 22px,
-    var(--river-deep) 22px 28px
-  );
-  background-size: 44px 100%;
-  opacity: 0.8;
-  animation: gorge-current 3s linear infinite;
-}
-/* A deeper, slower channel band for layered depth. */
-.river-current-deep {
-  top: 50%;
-  bottom: 0;
-  background: repeating-linear-gradient(
-    80deg,
-    var(--river-deep) 0 12px,
-    var(--turquoise-deep) 12px 18px,
-    var(--river-deep) 18px 30px
-  );
-  background-size: 60px 100%;
-  opacity: 0.6;
-  animation: gorge-current-deep 5s linear infinite;
-}
-@keyframes gorge-current {
-  from { background-position: 0 0; }
-  to { background-position: -44px 0; }
-}
-@keyframes gorge-current-deep {
-  from { background-position: 0 0; }
-  to { background-position: -60px 0; }
-}
-/* Travelling sparkle highlight swept across the water surface. */
-.river-sheen {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(230, 255, 252, 0) 42%,
-    rgba(230, 255, 252, 0.6) 50%,
-    rgba(230, 255, 252, 0) 58%,
-    transparent 100%
-  );
-  background-size: 320px 100%;
-  mix-blend-mode: screen;
-  animation: gorge-sheen 5.5s linear infinite;
-}
-@keyframes gorge-sheen {
-  from { background-position: -320px 0; }
-  to { background-position: 130% 0; }
-}
-/* Foam lines riding the surface, drifting at three speeds for depth. */
-.river-foam {
-  position: absolute;
-  left: -10%;
-  width: 120%;
-  height: 3px;
-  background: repeating-linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.55) 0 10px,
-    transparent 10px 26px,
-    rgba(255, 255, 255, 0.4) 26px 32px,
-    transparent 32px 54px
-  );
-  opacity: 0.7;
-}
-.river-foam-1 { top: 14%; animation: gorge-foam 7s linear infinite; }
-.river-foam-2 { top: 34%; opacity: 0.5; animation: gorge-foam 11s linear infinite reverse; }
-.river-foam-3 { top: 58%; height: 2px; opacity: 0.4; animation: gorge-foam 9s linear infinite; }
-@keyframes gorge-foam {
-  from { transform: translateX(0); }
-  to { transform: translateX(-54px); }
-}
-/* RAPIDS / standing waves with flecks of whitewater spray. */
-.river-rapid {
-  position: absolute;
-  width: 72px;
-  height: 26px;
-  background: radial-gradient(60% 80% at 50% 100%, rgba(255, 255, 255, 0.6) 0%, rgba(220, 255, 250, 0.2) 50%, transparent 75%);
-  mix-blend-mode: screen;
-}
-.river-rapid-1 { bottom: 22%; left: 58%; }
-.river-rapid-2 { bottom: 36%; left: 34%; transform: scale(0.8); }
-.rapid-spray {
-  position: absolute;
-  top: -6px;
-  left: 50%;
-  width: 8px;
-  height: 8px;
-  margin-left: -4px;
-  background: rgba(255, 255, 255, 0.85);
-  box-shadow: -8px 2px 0 -2px rgba(255, 255, 255, 0.6), 8px 1px 0 -2px rgba(255, 255, 255, 0.6),
-    0 -5px 0 -2px rgba(255, 255, 255, 0.7);
-  image-rendering: pixelated;
-  animation: rapid-bob 1.6s ease-in-out infinite;
-}
-.river-rapid-2 .rapid-spray { animation-delay: -0.8s; }
-@keyframes rapid-bob {
-  0%, 100% { transform: translateY(0); opacity: 0.85; }
-  50% { transform: translateY(-3px); opacity: 1; }
-}
-
-/* On narrow screens the gorge stays UNMISTAKABLY a canyon: the walls become a
-   framing canyon border that still carries a visible formation (the carved
-   skyline is pinned to the wall's outer edge), and the river floor keeps real
-   presence. The SVG is shifted so the dramatic outer formations (mesa, spires,
-   arch) stay in view rather than being cropped to a flat sliver. */
-@media (max-width: 880px) {
-  .gorge-wall { width: clamp(84px, 22vw, 150px); }
-  .canyon-wall-svg {
-    /* show the formation-rich OUTER band of the wall on the narrow column */
-    width: 220%;
-    filter: drop-shadow(3px 0 6px rgba(0, 0, 0, 0.4));
-  }
-  .gorge-river { height: clamp(72px, 15vh, 120px); }
-  /* keep the sky generous so the formations still silhouette above the wall */
-  .gorge-sky { height: 38%; min-height: 220px; }
-}
-@media (max-width: 480px) {
-  .gorge-wall { width: clamp(64px, 26vw, 110px); }
-  .canyon-wall-svg { width: 280%; }
-  .gorge-river { height: clamp(64px, 14vh, 104px); }
+.run-complete .judgment:nth-child(3) { animation-delay: 0.5s; }
+.run-complete .judgment:nth-child(2) { animation-delay: 0.35s; }
+@keyframes ledger-settle {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .skeleton,
   .strata.active::after,
   .dot.open,
+  .tab-live-led.open,
   .atmo-mesa,
   .atmo-clouds .cloud,
   .atmo-sun .sun-glow,
@@ -2862,33 +3388,43 @@ button.secondary {
   .spine-stack.is-active .spine-ember,
   .river-floor,
   .river-shimmer,
-  .gorge-cloud,
-  .river-current,
-  .river-current-deep,
-  .river-sheen,
-  .river-foam,
-  .river-fall,
-  .fall-mist,
-  .rapid-spray,
   .canyon-shell.run-complete::after,
   .run-complete .slab,
-  .run-complete .slab-headline,
+  .run-complete .slab-seal,
+  .run-complete .slab-stamp,
   .run-complete .slab-error::before,
   .run-complete .slab-repaired::before,
-  .run-complete .slab-guarded::before {
+  .run-complete .slab-guarded::before,
+  .run-complete .judgment,
+  .runlist li button.ledger-row::after,
+  .tablet::after,
+  .history-seal,
+  .story-input:focus,
+  .story-form.slate.just-sent,
+  .story-form.slate.just-sent .dispatch-btn {
     animation: none;
   }
+  /* Drifting sheens are pure decoration — hide them entirely at rest. */
+  .runlist li button.ledger-row::after,
+  .tablet::after { display: none; }
+  /* The ledger-row hover/focus cue is a state change, not motion — drop the
+     transition so it snaps to its end state (which still reads fully). */
+  .runlist li button.ledger-row { transition: none; }
+  /* The seal still reads, just without the press — hold it flush + visible. */
+  .history-seal { transform: none; opacity: 1; }
+  .run-complete .slab-stamp { transform: none; opacity: 1; }
+  .run-complete .judgment { opacity: 1; transform: none; }
   /* Without the wash, still hold the verdict glow statically so the moment is
      unmistakable, and keep the slab fully revealed. */
-  .run-complete .slab-headline { text-shadow: 0 0 12px var(--sun-bright), 0 1px 0 rgba(0, 0, 0, 0.6); }
+  .run-complete .slab-seal { text-shadow: 0 0 14px currentColor, 0 2px 0 rgba(0, 0, 0, 0.7); }
   .run-complete .slab { clip-path: none; opacity: 1; transform: none; }
   .river-shimmer { display: none; }
   /* Without the scan animation, mark the active layer with a solid sun-colored
      inset border so it is still unmistakably "the one running right now". */
   .strata.active {
     box-shadow: inset 0 0 0 2px var(--sun),
-      inset 0 var(--px) 0 rgba(255, 240, 210, 0.22),
-      inset 0 calc(-1 * var(--px)) 0 rgba(0, 0, 0, 0.35);
+      inset 0 var(--px) 0 rgba(255, 240, 210, 0.12),
+      inset 0 calc(-1 * var(--px)) 0 rgba(0, 0, 0, 0.22);
   }
   .strata.active::after {
     display: none;

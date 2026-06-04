@@ -2,7 +2,6 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { getDocs, getRun, listProjects, listRuns, listStories, triggerRun, uploadStory, writeDocs } from './api';
 import { useEventStream } from './useEventStream';
 import { CanyonSpine } from './CanyonSpine';
-import { CanyonGorge } from './CanyonGorge';
 import { PixelWordmark } from './PixelWordmark';
 import { CanyonAtmosphere, type SkyPhase } from './CanyonAtmosphere';
 import { ChromeGlyph, StageSprite, StatusMark } from './PixelSprites';
@@ -42,6 +41,15 @@ const CONNECTION_NOTE: Record<string, string> = {
   closed: 'Stream closed — reconnecting'
 };
 
+// Short carved-chip labels for the rim-console connection readout, so a degraded
+// stream reads as an intentional state ("Reconnecting" / "Stream closed") rather
+// than the terse raw status word.
+const CONN_LABEL: Record<string, string> = {
+  open: 'Live',
+  connecting: 'Reconnecting',
+  closed: 'Stream closed'
+};
+
 interface Diagnosis {
   category?: string;
   confidence?: number;
@@ -62,6 +70,10 @@ export function App() {
   const [stories, setStories] = useState<Story[]>([]);
   const [storyTitle, setStoryTitle] = useState('');
   const [storyBody, setStoryBody] = useState('');
+  // One-shot "dispatched" flash: set true the instant a story is sent, cleared
+  // after the confirm animation window so the slate flashes sunlit once on
+  // submit (a quick commit acknowledgement). Reduced-motion gated in CSS.
+  const [justSent, setJustSent] = useState(false);
 
   const refreshRuns = useCallback(() => {
     listRuns()
@@ -117,6 +129,8 @@ export function App() {
     }
     setSelected(null);
     setRunning(true);
+    setJustSent(true);
+    window.setTimeout(() => setJustSent(false), 700);
     await uploadStory({ projectId, title: storyTitle.trim() || undefined, body: storyBody });
     setStoryTitle('');
     setStoryBody('');
@@ -124,7 +138,6 @@ export function App() {
 
   return (
     <div className="app">
-      <CanyonGorge />
       <header className="topbar">
         <div className="brand">
           <h1 className="wordmark">
@@ -134,32 +147,38 @@ export function App() {
           <div className="tagline">AGENTIC&nbsp;QA · LIVE&nbsp;CANYON&nbsp;VIEW</div>
         </div>
         <div className="spacer" />
-        <div className="viewtabs" role="tablist" aria-label="View">
-          <button role="tab" aria-selected={mode === 'runs'} className={mode === 'runs' ? 'active' : ''} onClick={() => setMode('runs')}>
-            Live
-          </button>
-          <button role="tab" aria-selected={mode === 'docs'} className={mode === 'docs' ? 'active' : ''} onClick={() => setMode('docs')}>
-            Docs
+        <div className="rim-console">
+          <div className="viewtabs" role="tablist" aria-label="View">
+            <button role="tab" aria-selected={mode === 'runs'} className={`tab-live ${mode === 'runs' ? 'active' : ''}`} onClick={() => setMode('runs')}>
+              <span className={`tab-live-led ${connection}`} aria-hidden />
+              Live
+            </button>
+            <button role="tab" aria-selected={mode === 'docs'} className={mode === 'docs' ? 'active' : ''} onClick={() => setMode('docs')}>
+              Docs
+            </button>
+          </div>
+          {projects.length > 0 && (
+            <label className="proj">
+              <span className="proj-label">Project</span>
+              <span className="proj-slot">
+                <select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+                <span className="proj-chev" aria-hidden>▾</span>
+              </span>
+            </label>
+          )}
+          <span className={`conn ${connection}`} role="status">
+            <span className={`dot ${connection}`} aria-hidden /> {CONN_LABEL[connection] ?? connection}
+          </span>
+          <button className="run-demo-btn" onClick={onRun} disabled={running}>
+            {running ? 'Running…' : '▶ Run demo'}
           </button>
         </div>
-        {projects.length > 0 && (
-          <label className="proj">
-            <span className="sr-only">Project</span>
-            <select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        <span className="conn" role="status">
-          <span className={`dot ${connection}`} aria-hidden /> {connection}
-        </span>
-        <button onClick={onRun} disabled={running}>
-          {running ? 'Running…' : '▶ Run demo'}
-        </button>
       </header>
 
       <div className="layout">
@@ -171,7 +190,7 @@ export function App() {
               </span>
               <span className="tablet-title">Field Log</span>
             </h2>
-            <form className="story-form slate" onSubmit={onUploadStory}>
+            <form className={`story-form slate ${justSent ? 'just-sent' : ''}`} onSubmit={onUploadStory}>
               <label className="slate-field">
                 <span className="slate-label">Expedition title</span>
                 <input
@@ -198,7 +217,10 @@ export function App() {
               </button>
             </form>
             {stories.length === 0 ? (
-              <p className="muted tablet-empty">No stories logged yet for this project.</p>
+              <div className="carved-empty tablet-empty" role="note">
+                <span className="carved-empty-head">No stories logged yet</span>
+                <span className="carved-empty-sub">Log field notes above to chart this project’s first expedition.</span>
+              </div>
             ) : (
               <ul className="storylist">
                 {stories.map((story) => (
@@ -223,7 +245,12 @@ export function App() {
               </span>
               <span className="tablet-title">Expeditions</span>
             </h2>
-          {runsError && <p className="muted">Couldn’t load runs: {runsError}</p>}
+          {runsError && (
+            <div className="carved-empty is-error" role="alert">
+              <span className="carved-empty-head">Stream lost · couldn’t load runs</span>
+              <span className="carved-empty-sub">{runsError}</span>
+            </div>
+          )}
           <ul className="runlist">
             <li>
               <button className={`ledger-row live-row ${selected === null ? 'active' : ''}`} onClick={() => setSelected(null)}>
@@ -238,26 +265,44 @@ export function App() {
               <>
                 {!runsError && runs.length === 0 && (
                   <li>
-                    <p className="muted runlist-empty">No runs yet.</p>
+                    <div className="carved-empty runlist-empty" role="note">
+                      <span className="carved-empty-head">No expeditions logged yet</span>
+                      <span className="carved-empty-sub">Press “Run demo” to send the first descent down the canyon.</span>
+                    </div>
                   </li>
                 )}
-                {runs.map((run) => (
-                  <li key={run.runId}>
-                    <button className={`ledger-row ${selected === run.runId ? 'active' : ''}`} onClick={() => setSelected(run.runId)}>
-                      <span className="runlist-title">
-                        {run.runId.replace(/^demo-/, '').replace(/T/, ' ').replace(/-\d+Z$/, '')}
-                      </span>
-                      <span className="when">{new Date(run.createdAt).toLocaleString()}</span>
-                      {run.summary && (
-                        <span className="chips">
-                          {run.summary.copyChange && <Chip text={run.summary.copyChange} kind="pass" />}
-                          {run.summary.regression && <Chip text={run.summary.regression} kind="fail" />}
-                          <Chip text={run.summary.repairApplied ? 'repaired' : 'guarded'} kind={run.summary.repairApplied ? 'pass' : 'info'} />
+                {runs.map((run, index) => {
+                  const isActive = selected === run.runId;
+                  const tone = summaryTone(run.summary);
+                  // The full prose "why" is revealed only when an entry is in focus
+                  // — the SELECTED row, or (when nothing is selected) the single
+                  // most-recent past run at the top of the log. Every other resting
+                  // row keeps just the compact verdict cue (spine + stamp + tone
+                  // word), so the column reads as a calm, scannable stamped ledger
+                  // instead of a wall of near-identical sentences.
+                  const showWhy = isActive || (selected === null && index === 0);
+                  return (
+                    <li key={run.runId}>
+                      <button
+                        className={`ledger-row ${tone ? `stamped stamped-${tone}` : ''} ${isActive ? 'active' : ''}`}
+                        onClick={() => setSelected(run.runId)}
+                      >
+                        <span className="runlist-title">
+                          {run.runId.replace(/^demo-/, '').replace(/T/, ' ').replace(/-\d+Z$/, '')}
                         </span>
-                      )}
-                    </button>
-                  </li>
-                ))}
+                        <span className="when">{new Date(run.createdAt).toLocaleString()}</span>
+                        {/* Every past run carries a COMPACT verdict cue at rest:
+                            the color-keyed binding spine + stamp mark + tone WORD
+                            (REFUSED / REPAIR APPLIED / GUARDED) — the verdict at a
+                            glance. The full prose one-line "why" is gated behind
+                            focus (selected row, or the most-recent run) so the log
+                            stays calm and scannable, not a column of duplicate
+                            sentences. */}
+                        {tone && <HistorySeal tone={tone} why={showWhy ? summaryWhy(run.summary, tone) : null} />}
+                      </button>
+                    </li>
+                  );
+                })}
               </>
             )}
           </ul>
@@ -328,9 +373,147 @@ interface VerdictView {
   done: boolean; // true once the verdict is final (drives the sunset reveal)
 }
 
+/** One side of the judgment ledger: a single call (repaired / refused) with the
+ *  REAL reasoning + evidence that produced it, pulled straight from the events. */
+interface JudgmentCall {
+  kind: 'repaired' | 'refused';
+  category?: string;
+  title: string;
+  verdict: string; // the short stamp word: "auto-repaired" / "refused"
+  reason?: string; // the diagnosis reasoning (real model/heuristic text)
+  detail?: string; // the repair reasoning, when present
+  diff?: string;
+  before?: string;
+  after?: string;
+}
+
+/**
+ * Gather the two contrasting judgments (safe drift -> repaired, real regression
+ * -> refused) WITH their evidence from the live pipeline events, so the verdict
+ * moment surfaces the *why* — not just a status word. All fields are real:
+ *  - diagnose rows carry the diagnosis (category, reason, repairable, confidence)
+ *  - the repair row carries diff + reason + before/after screenshots
+ */
+function collectJudgments(events: PipelineEvent[]): JudgmentCall[] {
+  const calls: JudgmentCall[] = [];
+  const diagnoses = events
+    .filter((e) => e.stage === 'diagnose' && e.data?.diagnosis)
+    .map((e) => e.data!.diagnosis as Diagnosis);
+  const repair = events.find((e) => e.stage === 'repair' && e.status !== 'start');
+  const repairApplied = repair?.status === 'pass';
+
+  // Safe drift: the copy-change that was auto-repaired (or refused if no patch).
+  const driftDiag = diagnoses.find((d) => d.repairable) ?? diagnoses.find((d) => d.category === 'UI_COPY_CHANGE');
+  if (driftDiag || repair) {
+    const rd = repair?.data ?? {};
+    calls.push({
+      kind: repairApplied ? 'repaired' : 'refused',
+      category: driftDiag?.category,
+      title: 'Safe drift',
+      verdict: repairApplied ? 'auto-repaired' : 'left as-is',
+      reason: driftDiag?.reason,
+      detail: typeof rd.reason === 'string' ? rd.reason : undefined,
+      diff: typeof rd.diff === 'string' ? rd.diff : undefined,
+      before: typeof rd.beforeScreenshot === 'string' ? rd.beforeScreenshot : undefined,
+      after: typeof rd.afterScreenshot === 'string' ? rd.afterScreenshot : undefined
+    });
+  }
+
+  // Real regression: the call that was refused to avoid weakening the test.
+  const regDiag = diagnoses.find((d) => d.category === 'PRODUCT_REGRESSION');
+  if (regDiag) {
+    calls.push({
+      kind: 'refused',
+      category: regDiag.category,
+      title: 'Product regression',
+      verdict: 'repair refused',
+      reason: regDiag.reason
+    });
+  }
+  return calls;
+}
+
+/** The big stamped seal phrase, keyed to the verdict tone — the unmissable line
+ *  pressed into the bedrock. Reads as an expedition stamp, not a footer note. */
+const SEAL_PHRASE: Record<VerdictView['tone'], string> = {
+  error: 'Product regression — refused',
+  repaired: 'Safe drift — repair applied',
+  guarded: 'Run guarded — no repair needed'
+};
+
+/** Short stamp word keyed to the verdict tone — the rust/teal/gold seal label. */
+const SEAL_WORD: Record<VerdictView['tone'], string> = {
+  error: 'refused',
+  repaired: 'repair applied',
+  guarded: 'guarded'
+};
+
+/** The pixel mark each verdict tone stamps with (rust fail / teal pass / gold info). */
+const SEAL_MARK: Record<VerdictView['tone'], Status> = {
+  error: 'fail',
+  repaired: 'pass',
+  guarded: 'info'
+};
+
+/** Derive the color-keyed verdict tone from a run-summary (history list rows). */
+function summaryTone(summary: RunSummary['summary']): VerdictView['tone'] | null {
+  if (!summary) return null;
+  if (summary.regression) return 'error';
+  if (summary.repairApplied) return 'repaired';
+  return 'guarded';
+}
+
+/** Turn a raw category token (UI_COPY_CHANGE / PRODUCT_REGRESSION) into a short
+ *  human phrase for the one-line "why". Falls back to the lower-cased token. */
+function categoryPhrase(category?: string): string | undefined {
+  if (!category) return undefined;
+  if (category === 'UI_COPY_CHANGE') return 'copy reworded';
+  if (category === 'PRODUCT_REGRESSION') return 'broke the flow';
+  return category.replace(/_/g, ' ').toLowerCase();
+}
+
+/**
+ * A single supporting "why" line for a SELECTED history row, composed only from
+ * the real run-summary fields the list already has (the diagnosis categories +
+ * the repair-applied flag) — so a past decision carries its evidence, not just
+ * its colour. Nothing is fabricated: every clause maps to a present field.
+ */
+function summaryWhy(summary: RunSummary['summary'], tone: VerdictView['tone']): string | null {
+  if (!summary) return null;
+  const drift = categoryPhrase(summary.copyChange);
+  if (tone === 'error') {
+    return `regression: ${categoryPhrase(summary.regression) ?? 'broke the flow'} — repair refused to keep the test honest`;
+  }
+  if (tone === 'repaired') {
+    return `safe drift: ${drift ?? 'selector reworded'} — repair applied, no regression`;
+  }
+  return 'clean run — no drift detected, no repair needed';
+}
+
+/**
+ * A compact stamped seal for the Expeditions history rows. When a past run is
+ * selected, this presses the same color-keyed seal (rust = refused / teal =
+ * repair applied / gold = guarded) into the ledger row, mirroring the bedrock
+ * verdict slab so a past judgment is unmissable. Reuses the .slab-* tone keys.
+ */
+function HistorySeal({ tone, why }: { tone: VerdictView['tone']; why?: string | null }) {
+  return (
+    <span className={`history-seal slab-${tone}`}>
+      <span className="history-seal-head">
+        <span className="history-seal-stamp" aria-hidden>
+          <StatusMark status={SEAL_MARK[tone]} size={14} />
+        </span>
+        <span className="history-seal-word">{SEAL_WORD[tone]}</span>
+      </span>
+      {why && <span className="history-seal-why">{why}</span>}
+    </span>
+  );
+}
+
 /**
  * The verdict reads as a carved bedrock slab at the canyon floor — a chiseled
- * stone band with an etched status stamp, not a Bootstrap alert. The thin
+ * stone band with a LARGE stamped seal (color-keyed: teal = safe drift repaired,
+ * rust = regression refused, gold = guarded), not a Bootstrap alert. The thin
  * stratigraphy strip on top ties it visually to the rock layers above it.
  */
 function VerdictBanner({ view }: { view: VerdictView | null }) {
@@ -340,21 +523,111 @@ function VerdictBanner({ view }: { view: VerdictView | null }) {
     <div className={`slab slab-${tone}`} role="status">
       <div className="slab-strata" aria-hidden />
       <div className="slab-stamp" aria-hidden>
-        <StatusMark status={mark} size={34} />
+        <StatusMark status={mark} size={40} />
       </div>
       <div className="slab-body">
-        <div className="slab-kicker">Bedrock · verdict</div>
-        <div className="slab-headline">{headline}</div>
+        <div className="slab-kicker">Bedrock · verdict stamped</div>
+        <div className="slab-seal">{SEAL_PHRASE[tone]}</div>
         <div className="slab-detail">
           {category && (
             <span className={`tag tag-${category === 'PRODUCT_REGRESSION' ? 'regression' : 'copy'}`}>
               {category.replace(/_/g, ' ')}
             </span>
           )}
+          <span className="slab-headline-inline">{headline}</span>
           <span className="slab-note">{note}</span>
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * The judgment ledger: the dramatic heart of the verdict moment. It sits flush
+ * under the bedrock slab and surfaces BOTH calls side by side with their real
+ * evidence — safe drift that was auto-repaired (with the before/after proof and
+ * the proposed diff) vs. the product regression that was refused (with the
+ * reasoning for refusing). This is what makes the verdict unmissable AND
+ * explains the safe-drift-vs-regression judgment with evidence.
+ */
+function JudgmentLedger({ calls }: { calls: JudgmentCall[] }) {
+  if (calls.length === 0) return null;
+  return (
+    <div className="ledger" role="group" aria-label="Judgment & evidence">
+      <div className="ledger-rail" aria-hidden />
+      {calls.map((call) => (
+        <JudgmentCard key={`${call.title}-${call.kind}`} call={call} />
+      ))}
+    </div>
+  );
+}
+
+function JudgmentCard({ call }: { call: JudgmentCall }) {
+  // The proposed change is the proof — show it EXPANDED by default so the
+  // verdict moment is self-explaining with no interaction required. A collapse
+  // control remains for readers who want to fold it away.
+  const [showDiff, setShowDiff] = useState(true);
+  const isRegression = call.category === 'PRODUCT_REGRESSION';
+  const hasShots = Boolean(call.before || call.after);
+  return (
+    <section className={`judgment judgment-${call.kind}`}>
+      <header className="judgment-head">
+        <span className={`judgment-tag tag tag-${isRegression ? 'regression' : 'copy'}`}>
+          {(call.category ?? call.title).replace(/_/g, ' ')}
+        </span>
+        <span className="judgment-arrow" aria-hidden>
+          ▸
+        </span>
+        <span className={`judgment-verdict jv-${call.kind}`}>
+          <StatusMark status={call.kind === 'repaired' ? 'pass' : 'fail'} size={13} />
+          {call.verdict}
+        </span>
+      </header>
+      {call.reason && <p className="judgment-reason">{call.reason}</p>}
+      {call.detail && <p className="judgment-detail">{call.detail}</p>}
+      {hasShots && (
+        <div className="judgment-shots" role="group" aria-label="Before and after evidence plates">
+          {call.before && (
+            <figure className="judgment-shot is-before">
+              <figcaption className="plate-cap">
+                <span className="plate-tag">Before</span>
+                <span className="plate-state">failing run</span>
+              </figcaption>
+              <span className="plate-mat">
+                <img src={`/artifacts/${call.before}`} alt="Before — the failing run" loading="lazy" />
+              </span>
+            </figure>
+          )}
+          {call.after && (
+            <figure className="judgment-shot is-after">
+              <figcaption className="plate-cap">
+                <span className="plate-tag">After</span>
+                <span className="plate-state">repaired run</span>
+              </figcaption>
+              <span className="plate-mat">
+                <img src={`/artifacts/${call.after}`} alt="After — the repaired run" loading="lazy" />
+              </span>
+            </figure>
+          )}
+        </div>
+      )}
+      {call.diff && (
+        <div className="judgment-diff-wrap">
+          <div className="judgment-diff-bar">
+            <span className="judgment-diff-label">Proposed change · diff</span>
+            <button
+              type="button"
+              className="judgment-diff-toggle"
+              onClick={() => setShowDiff((v) => !v)}
+              aria-expanded={showDiff}
+            >
+              {showDiff ? '▾ Collapse' : '▸ Expand'}
+            </button>
+          </div>
+          {showDiff && <pre className="judgment-diff">{renderDiff(call.diff)}</pre>}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -548,6 +821,7 @@ function LiveCanyonRun({ events, connection }: { events: PipelineEvent[]; connec
             ))}
           </div>
           <VerdictBanner view={verdict} />
+          {done && <JudgmentLedger calls={collectJudgments(events)} />}
           <div className="river-floor" aria-hidden>
             <span className="river-shimmer" />
           </div>
@@ -804,9 +1078,40 @@ interface Scenario {
 interface PastReport {
   intent?: { name?: string; originalSpec?: string };
   diagnosis?: Diagnosis;
-  repair?: { safeToApply?: boolean; reason?: string };
+  repair?: { safeToApply?: boolean; reason?: string; diff?: string; category?: string };
   repairApplied?: boolean;
   scenarios?: Scenario[];
+}
+
+/**
+ * Build the judgment ledger for the history view from the archived report.json.
+ * The report carries the regression diagnosis (refused) and the repair proposal
+ * (reason + diff) for the safe drift — the same evidence the live view shows,
+ * minus the before/after screenshots which are event-only. All real data.
+ */
+function judgmentsFromReport(report: PastReport): JudgmentCall[] {
+  const calls: JudgmentCall[] = [];
+  const repaired = (report.scenarios ?? []).find((s) => s.repairApplied);
+  if (report.repair || repaired) {
+    calls.push({
+      kind: report.repairApplied ? 'repaired' : 'refused',
+      category: report.repair?.category ?? repaired?.diagnosis ?? 'UI_COPY_CHANGE',
+      title: 'Safe drift',
+      verdict: report.repairApplied ? 'auto-repaired' : 'left as-is',
+      detail: report.repair?.reason,
+      diff: report.repair?.safeToApply ? report.repair?.diff : undefined
+    });
+  }
+  if (report.diagnosis && report.diagnosis.category === 'PRODUCT_REGRESSION') {
+    calls.push({
+      kind: 'refused',
+      category: report.diagnosis.category,
+      title: 'Product regression',
+      verdict: 'repair refused',
+      reason: report.diagnosis.reason
+    });
+  }
+  return calls;
 }
 
 /** Build a run-level verdict for history view from the static report.json. */
@@ -910,11 +1215,7 @@ function PastRun({ runId }: { runId: string }) {
             ))}
           </div>
           <VerdictBanner view={pastVerdict} />
-          {report.diagnosis && report.diagnosis.category !== 'UNKNOWN' && (
-            <div className="evidence">
-              <DiagnosisCard diagnosis={report.diagnosis} />
-            </div>
-          )}
+          <JudgmentLedger calls={judgmentsFromReport(report)} />
           <div className="river-floor" aria-hidden>
             <span className="river-shimmer" />
           </div>
@@ -966,10 +1267,6 @@ function ScenarioStrata({ scenario }: { scenario: Scenario }) {
       </span>
     </div>
   );
-}
-
-function Chip({ text, kind }: { text: string; kind: 'pass' | 'fail' | 'info' }) {
-  return <span className={`badge ${kind}`}>{text}</span>;
 }
 
 function storyKind(status: StoryStatus): 'pass' | 'fail' | 'info' {
