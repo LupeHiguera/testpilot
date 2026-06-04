@@ -224,12 +224,18 @@ function CanyonWall({ side }: { side: 'left' | 'right' }): ReactElement {
       {/* ---- SKYLINE FORMATIONS — drawn AFTER the body, NOT clipped, so their
           silhouettes rise crisply against the open sky above the wall. ---- */}
 
+      {/* ALL FOUR signature formations are clustered in the OUTER 0–210 band of
+          the viewBox so that — at desktop, where only the outer ~210 units of the
+          wall show in the open side margin — the mesa, hoodoo spires, sky-through
+          arch and balanced rock ALL silhouette against the sky. The plain inner
+          step-buttes live past x=210, where they recede behind the content. */}
+
       {/* THE GUARDIAN MESA — a tall flat-topped caprock block at the outer edge,
           with a lit cap rim and a darker base. The tallest skyline element. */}
       <g className="wall-mesa">
-        <polygon className="mesa-body" points="18,70 96,70 96,300 0,300 0,108" />
-        <rect className="mesa-cap" x="12" y="62" width="90" height="10" />
-        <rect className="mesa-shadow" x="80" y="70" width="16" height="230" />
+        <polygon className="mesa-body" points="14,58 72,58 72,300 0,300 0,96" />
+        <rect className="mesa-cap" x="8" y="50" width="68" height="11" />
+        <rect className="mesa-shadow" x="58" y="58" width="14" height="242" />
       </g>
 
       {/* THE SENTINEL SPIRES — a cluster of stout tapered HOODOO spires of varied
@@ -238,51 +244,51 @@ function CanyonWall({ side }: { side: 'left' | 'right' }): ReactElement {
           on the ledge (bottoms ~y=300) rather than running the whole face. */}
       <g className="wall-spires">
         {/* tall central hoodoo — bulbous cap on a tapered stem, a waist band */}
-        <polygon className="spire" points="118,150 138,150 134,304 122,304" />
-        <ellipse className="spire-cap" cx="128" cy="146" rx="17" ry="10" />
-        <ellipse className="spire-cap2" cx="128" cy="220" rx="13" ry="7" />
-        {/* shorter hoodoo */}
-        <polygon className="spire" points="148,196 164,196 161,304 151,304" />
-        <ellipse className="spire-cap" cx="156" cy="192" rx="13" ry="8" />
-        {/* stubby hoodoo */}
-        <polygon className="spire" points="98,228 110,228 108,304 100,304" />
-        <ellipse className="spire-cap" cx="104" cy="224" rx="10" ry="6" />
+        <polygon className="spire" points="98,120 120,120 115,304 103,304" />
+        <ellipse className="spire-cap" cx="109" cy="116" rx="19" ry="11" />
+        <ellipse className="spire-cap2" cx="109" cy="200" rx="14" ry="7" />
+        {/* shorter hoodoo (outer) */}
+        <polygon className="spire" points="80,178 96,178 93,304 83,304" />
+        <ellipse className="spire-cap" cx="88" cy="174" rx="13" ry="8" />
+        {/* stubby hoodoo (inner) */}
+        <polygon className="spire" points="126,206 140,206 138,304 128,304" />
+        <ellipse className="spire-cap" cx="133" cy="202" rx="11" ry="7" />
+      </g>
+
+      {/* BALANCED ROCK — a wide boulder perched on a slender eroded neck, standing
+          clear on the saddle between the spires and the arch. */}
+      <g className="wall-balanced">
+        <rect className="balanced-neck" x="150" y="150" width="13" height="62" />
+        <ellipse className="balanced-cap" cx="156" cy="138" rx="27" ry="18" />
+        <ellipse className="balanced-shadow" cx="163" cy="142" rx="19" ry="11" />
       </g>
 
       {/* SKYBRIDGE ARCH — a natural arch with a REAL sky-through opening (the void
           is the page sky showing through, not paint). Two thick piers carry a
-          spanning lintel; the wide gap beneath shows sky. Sits in the outer band
-          so it stays visible beside the centered content. */}
+          spanning lintel; the wide gap beneath shows sky. Sits at the inner end of
+          the visible band so it still clears the content panel. */}
       <g className="wall-arch">
         <path
           className="arch-mass"
-          d="M176,120 L228,120 L228,300 L212,300 L212,210
-             Q202,184 192,210 L192,300 L176,300 Z"
+          d="M168,116 L214,116 L214,300 L200,300 L200,206
+             Q191,180 182,206 L182,300 L168,300 Z"
         />
         {/* lit rim catching light along the top of the span */}
-        <rect className="arch-rim" x="176" y="120" width="52" height="11" />
+        <rect className="arch-rim" x="168" y="116" width="46" height="11" />
         {/* soft inner shadow lining the underside of the span opening */}
         <path
           className="arch-inner"
-          d="M180,210 Q202,176 224,210 L224,222 Q202,190 180,222 Z"
+          d="M172,206 Q191,174 210,206 L210,218 Q191,186 172,218 Z"
         />
       </g>
 
-      {/* BALANCED ROCK — a wide boulder perched on a slender eroded neck, set on
-          the inner shoulder so it stands clear against the sky. */}
-      <g className="wall-balanced">
-        <rect className="balanced-neck" x="256" y="170" width="14" height="64" />
-        <ellipse className="balanced-cap" cx="263" cy="158" rx="30" ry="20" />
-        <ellipse className="balanced-shadow" cx="270" cy="162" rx="22" ry="13" />
-      </g>
-
       {/* THE STEP BUTTES — a descending run of mesas stepping inward toward the
-          gorge floor, giving the inner skyline a layered, eroded read. */}
+          gorge floor (in the inner band, behind the content), giving depth. */}
       <g className="wall-stepbuttes">
-        <polygon className="butte-body" points="300,250 360,250 360,420 290,420 290,290" />
-        <rect className="butte-cap" x="290" y="246" width="70" height="6" />
-        <polygon className="butte-body" points="320,330 360,330 360,470 312,470 312,360" />
-        <rect className="butte-cap" x="312" y="326" width="48" height="5" />
+        <polygon className="butte-body" points="244,250 312,250 312,420 234,420 234,290" />
+        <rect className="butte-cap" x="234" y="246" width="78" height="6" />
+        <polygon className="butte-body" points="300,330 360,330 360,470 292,470 292,360" />
+        <rect className="butte-cap" x="292" y="326" width="68" height="5" />
       </g>
     </svg>
   );
@@ -296,16 +302,15 @@ function CanyonWall({ side }: { side: 'left' | 'right' }): ReactElement {
  * fill, the strata clip and the decoration clip so they always agree.
  */
 const WALL_PATH =
-  'M0,108 ' +
+  'M0,96 ' +
   // GUARDIAN MESA outer shoulder (its flat cap is the highest skyline point)
-  'L18,108 L96,70 L96,300 ' +
-  // deep SADDLE across the spire field so the hoodoos rise free against sky
-  'L112,300 L150,300 L176,300 ' +
+  'L14,96 L72,58 L72,300 ' +
+  // deep SADDLE across the spire + balanced-rock + arch field so they rise free
+  'L98,300 L150,300 L168,300 ' +
   // ARCH springs up out of the body (its piers + sky-through gap stand above)
-  'L228,300 ' +
-  // shoulder dips again, BALANCED ROCK perches on this lower neck shelf
-  'L250,250 L290,250 ' +
-  // recede to the inner STEP BUTTES, then drop to the canyon floor
+  'L214,300 ' +
+  // recede to the inner STEP BUTTES (behind the content), then drop to the floor
+  'L244,250 L312,250 ' +
   'L360,300 ' +
   'L360,1000 L0,1000 Z';
 
