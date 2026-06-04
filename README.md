@@ -107,7 +107,10 @@ npm run testpilot -- repair tests/generated/login.spec.ts runs/<run>/run-result.
 
 A Grand Canyon themed dashboard streams a run stage-by-stage: each pipeline stage
 forms a "canyon stratum" that you can expand to its evidence (screenshot, diagnosis
-and reasoning, diff, verdict) as events arrive over Server-Sent Events.
+and reasoning, diff, verdict) as events arrive over Server-Sent Events. The sky even
+ages from day to sundown as a run descends.
+
+![The first-visit canyon vista — watch a run descend the canyon](docs/canyon-vista.png)
 
 ```bash
 npm run ui:build      # build the dashboard (ui/ -> ui/dist)
