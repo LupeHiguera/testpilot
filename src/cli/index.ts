@@ -104,7 +104,7 @@ program
       diagnosis,
       runResult
     });
-    const validation = validatePatch(proposal, diagnosis);
+    const validation = validatePatch(proposal, diagnosis, intent);
     if (!validation.valid) {
       console.log(`Refused repair: ${validation.reason}`);
       return;

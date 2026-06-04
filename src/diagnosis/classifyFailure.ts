@@ -33,11 +33,19 @@ export async function classifyFailure(runResult: RunResult, intent: TestIntent):
     };
   }
 
-  if (/getByText\('Sign in'|button.*Sign in|name: 'Sign in'|Sign in/i.test(output) && artifacts?.buttons.some((button) => button === 'Log in')) {
+  // UI copy change: the test looked for the submit control by its (old) label, that
+  // exact label is no longer on the page, but the page DOES still expose a button —
+  // i.e. the control was relabelled, not removed. Keyed off the parsed intent so this
+  // works for any flow, not just the login demo's "Sign in" → "Log in".
+  const submitText = intent.submitText?.trim();
+  const lookedForSubmit = Boolean(submitText) && output.toLowerCase().includes(submitText!.toLowerCase());
+  const pageHasSubmit = artifacts?.buttons.some((button) => button === submitText) ?? false;
+  const pageHasAnotherButton = (artifacts?.buttons.length ?? 0) > 0 && !pageHasSubmit;
+  if (lookedForSubmit && pageHasAnotherButton) {
     return {
       category: 'UI_COPY_CHANGE',
       confidence: 0.9,
-      reason: 'The generated test looked for the old submit text, but the page still exposes an equivalent login button.',
+      reason: `The test looked for the "${submitText}" control, but the page now exposes a differently-labelled equivalent button.`,
       repairable: true
     };
   }

@@ -30,6 +30,25 @@ describe('classifyFailure', () => {
     expect(result.category).toBe('PRODUCT_REGRESSION');
     expect(result.repairable).toBe(false);
   });
+
+  // The generalization: copy-change detection keys off intent.submitText, so it
+  // works for any flow — here a checkout whose "Place order" button was relabelled.
+  it('classifies a non-login button relabel as UI_COPY_CHANGE via the intent', async () => {
+    const checkoutIntent: TestIntent = {
+      ...intent,
+      name: 'checkout',
+      submitText: 'Place order',
+      expectedPath: '/confirmation',
+      expectedText: 'Order placed'
+    };
+    const result = await classifyFailure(
+      makeRunResult("Timeout waiting for getByRole('button', { name: 'Place order' })", ['Complete purchase']),
+      checkoutIntent
+    );
+
+    expect(result.category).toBe('UI_COPY_CHANGE');
+    expect(result.repairable).toBe(true);
+  });
 });
 
 function makeRunResult(error: string, buttons: string[]): RunResult {

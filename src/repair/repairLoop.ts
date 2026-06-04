@@ -102,7 +102,7 @@ export async function runRepairLoop(deps: RepairLoopDeps): Promise<RepairLoopRes
     const observation = await observe();
     lastObservation = observation;
     const proposal = await proposePatch(client, { testPath, diagnosis, runResult: currentRun, observation });
-    const validation = validatePatch(proposal, diagnosis);
+    const validation = validatePatch(proposal, diagnosis, intent);
 
     if (!validation.valid) {
       emit('repair', 'info', `Repair refused: ${validation.reason}`, { attempt, maxAttempts });
