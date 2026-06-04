@@ -135,6 +135,33 @@ describe('runRepairLoop', () => {
     expect(result.attempts.at(-1)?.stoppedReason).toBe('no progress');
   });
 
+  it('exhausts its attempt budget and escalates when repairs keep failing', async () => {
+    let proposeCalls = 0;
+    let runCalls = 0;
+    const result = await runRepairLoop({
+      testPath,
+      intent,
+      firstRun: failRun('UI_COPY_CHANGE'),
+      client: fakeClient(async () => {
+        proposeCalls += 1;
+        return validProposal(`// attempt ${proposeCalls}`); // distinct each time → not "no progress"
+      }),
+      observe: async () => observation,
+      runTest: async () => {
+        runCalls += 1;
+        return failRun('SELECTOR_DRIFT'); // still a repairable drift, but never passes
+      },
+      emit: () => {},
+      maxAttempts: 2
+    });
+
+    expect(result.status).toBe('needs-review');
+    expect(proposeCalls).toBe(2); // applied exactly maxAttempts patches
+    expect(runCalls).toBe(2);
+    expect(result.attempts).toHaveLength(2);
+    expect(result.attempts.every((a) => a.applied && !a.passedAfter)).toBe(true);
+  });
+
   it('refuses an invalid proposal without re-running', async () => {
     let runCalls = 0;
     const result = await runRepairLoop({

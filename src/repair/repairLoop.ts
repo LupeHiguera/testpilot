@@ -72,7 +72,7 @@ export async function runRepairLoop(deps: RepairLoopDeps): Promise<RepairLoopRes
 
   let currentRun = deps.firstRun;
   let lastProposal: RepairProposal | undefined;
-  let lastProposedContent: string | undefined;
+  const appliedContents = new Set<string>();
   let lastObservation: ObservationArtifacts | undefined;
   let repairApplied = false;
   let diagnosis: Diagnosis = await diagnoseFailure(currentRun, intent, client, { vision });
@@ -111,8 +111,10 @@ export async function runRepairLoop(deps: RepairLoopDeps): Promise<RepairLoopRes
       return finish('needs-review');
     }
 
-    if (proposal.proposedContent === lastProposedContent) {
-      // The model repeated the previous patch — re-running would only thrash.
+    if (appliedContents.has(proposal.proposedContent)) {
+      // The model re-proposed a patch we already tried — re-running it would only
+      // thrash, so stop. (A Set, not just the previous patch, so an A→B→A
+      // oscillation is also caught when maxAttempts > 2.)
       emit('repair', 'info', `Stopped after attempt ${attempt}: the repair made no further progress`, { attempt, maxAttempts });
       attempts.push({ attempt, category: diagnosis.category, reason: proposal.reason, applied: false, passedAfter: false, stoppedReason: 'no progress' });
       lastProposal = proposal;
@@ -130,7 +132,7 @@ export async function runRepairLoop(deps: RepairLoopDeps): Promise<RepairLoopRes
     await applyRepair(proposal);
     repairApplied = true;
     lastProposal = proposal;
-    lastProposedContent = proposal.proposedContent;
+    appliedContents.add(proposal.proposedContent);
 
     const rerun = await runTest();
     const afterScreenshot = relArtifact?.(observation.screenshotPath);
@@ -155,9 +157,13 @@ export async function runRepairLoop(deps: RepairLoopDeps): Promise<RepairLoopRes
       return finish('passing');
     }
 
-    // Still failing: re-diagnose the NEW failure before the next attempt.
+    // Still failing: re-diagnose the NEW failure before the next attempt — but
+    // only when another attempt will actually run, so the exhausted-repair path
+    // doesn't spend a wasted (vision) diagnosis whose result is never used.
     currentRun = rerun;
-    diagnosis = await diagnoseFailure(currentRun, intent, client, { vision });
+    if (attempt < maxAttempts) {
+      diagnosis = await diagnoseFailure(currentRun, intent, client, { vision });
+    }
   }
 
   emit('repair', 'info', `Repair did not pass after ${maxAttempts} attempt(s)`, { attempt: maxAttempts, maxAttempts });
