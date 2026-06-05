@@ -277,7 +277,8 @@ specCmd
     const config = source?.config as unknown as JiraSourceConfig | undefined;
     if (!config?.mcp) {
       console.error(
-        'No Jira source configured. Add a sources[] entry of type "jira" with config.mcp (server launch) and config.jql to the project file.'
+        'No Jira source configured. Add a sources[] entry of type "jira" with config.jql and config.mcp ' +
+          '(either a stdio launch { command, args, env } or a remote endpoint { transport: "http"|"sse", url, headers }) to the project file.'
       );
       process.exitCode = 1;
       return;

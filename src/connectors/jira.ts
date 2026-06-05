@@ -2,7 +2,8 @@ import { callToolText, McpServerConfig, withMcpClient } from '../mcp/client.js';
 
 export interface JiraSourceConfig {
   jql: string;
-  /** How to launch the Jira/Atlassian MCP server (varies per deployment). */
+  /** How to reach the Jira/Atlassian MCP server: a local stdio launch
+   *  ({ command, args, env }) or a remote endpoint ({ transport: 'http' | 'sse', url, headers }). */
   mcp: McpServerConfig;
   /** Tool name to call for a JQL search; defaults to the common `jira_search`. */
   tool?: string;
