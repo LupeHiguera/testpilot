@@ -468,6 +468,37 @@ function JudgmentLedger({ calls }: { calls: JudgmentCall[] }) {
   );
 }
 
+/** One shared on-theme non-happy state (loading / empty / error): a carved
+ *  engraved stone slip, tone-keyed — so every state belongs to the canyon world
+ *  rather than falling back to a bare muted sentence. */
+function CarvedState({ head, sub, tone }: { head: string; sub?: string; tone?: 'error' }) {
+  return (
+    <div className={`carved-empty${tone === 'error' ? ' is-error' : ''}`} role={tone === 'error' ? 'alert' : 'status'}>
+      <span className="carved-empty-head">{head}</span>
+      {sub && <span className="carved-empty-sub">{sub}</span>}
+    </div>
+  );
+}
+
+/** A before/after evidence plate that HEALS a missing or failed capture into an
+ *  on-theme "capture unavailable" slip instead of the raw <img>'s black fallback
+ *  (which read as a dark void, especially stacked full-width at 375). */
+function PlateImage({ src, alt }: { src: string; alt: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <span className="plate-missing" role="img" aria-label={`${alt} — capture unavailable`}>
+        <span className="plate-missing-mark" aria-hidden>▦</span>
+        <span className="plate-missing-text">capture unavailable</span>
+      </span>
+    );
+  }
+  // Eager (not lazy): these two verdict plates are the signature evidence and sit far
+  // down a tall mobile page — lazy-loading left them as a dark void at 375. onError still
+  // heals a genuinely-missing artifact into the on-theme placeholder above.
+  return <img src={`/artifacts/${src}`} alt={alt} onError={() => setFailed(true)} />;
+}
+
 function JudgmentCard({ call }: { call: JudgmentCall }) {
   // The proposed change is the proof — show it EXPANDED by default so the
   // verdict moment is self-explaining with no interaction required. A collapse
@@ -500,7 +531,7 @@ function JudgmentCard({ call }: { call: JudgmentCall }) {
                 <span className="plate-state">failing run</span>
               </figcaption>
               <span className="plate-mat">
-                <img src={`/artifacts/${call.before}`} alt="Before — the failing run" loading="lazy" />
+                <PlateImage src={call.before} alt="Before — the failing run" />
               </span>
             </figure>
           )}
@@ -511,7 +542,7 @@ function JudgmentCard({ call }: { call: JudgmentCall }) {
                 <span className="plate-state">repaired run</span>
               </figcaption>
               <span className="plate-mat">
-                <img src={`/artifacts/${call.after}`} alt="After — the repaired run" loading="lazy" />
+                <PlateImage src={call.after} alt="After — the repaired run" />
               </span>
             </figure>
           )}
@@ -1045,14 +1076,14 @@ function PastRun({ runId }: { runId: string }) {
   if (error) {
     return (
       <div className="panel hero">
-        <p className="muted">Couldn’t load this run: {error}</p>
+        <CarvedState tone="error" head="Couldn’t load this expedition" sub={error} />
       </div>
     );
   }
   if (!report) {
     return (
       <div className="panel hero">
-        <p className="muted">Loading…</p>
+        <CarvedState head="Reading the expedition log…" sub="Recovering the recorded descent." />
       </div>
     );
   }
@@ -1168,14 +1199,14 @@ function DocsView({ projectId }: { projectId: string }) {
   if (error) {
     return (
       <div className="panel hero">
-        <p className="muted">Couldn’t load docs: {error}</p>
+        <CarvedState tone="error" head="Couldn’t load the survey journal" sub={error} />
       </div>
     );
   }
   if (!docs) {
     return (
       <div className="panel hero">
-        <p className="muted">Loading…</p>
+        <CarvedState head="Opening the survey journal…" sub="Gathering documented flows." />
       </div>
     );
   }
@@ -1203,7 +1234,7 @@ function DocsView({ projectId }: { projectId: string }) {
         </p>
       )}
       {docs.flows.length === 0 ? (
-        <p className="muted docs-empty">No stories yet — log one in the Field Log to document a flow.</p>
+        <CarvedState head="No flows documented yet" sub="Log a story in the Field Log to chart this project’s first flow." />
       ) : (
         <div className="doclist">
           {docs.flows.map((flow) => (

@@ -2942,6 +2942,35 @@ button.secondary {
     0 2px 0 rgba(0, 0, 0, 0.45);
   background: #05080b;
 }
+/* A missing / failed capture HEALS into an on-theme carved slip — a hatched stone
+   face with a quiet stamped caption — instead of the raw <img>'s near-black void
+   (which is what read as a "dark thumbnail", especially stacked full-width at 375). */
+.plate-missing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s1);
+  min-height: 116px;
+  padding: var(--s3);
+  text-align: center;
+  border: var(--px) solid var(--tablet-base);
+  background:
+    repeating-linear-gradient(135deg, rgba(246, 236, 216, 0.035) 0 6px, transparent 6px 12px),
+    linear-gradient(180deg, var(--strata-7), var(--strata-8));
+  box-shadow: inset 0 0 0 var(--px) rgba(0, 0, 0, 0.5);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sand-dim);
+}
+.plate-missing-mark {
+  font-size: 22px;
+  line-height: 1;
+  opacity: 0.5;
+}
 /* The proposed-change DIFF reads as a carved field-journal artifact, not a
    default dark terminal pane: a chiseled warm-stone frame (matching the field
    tablets) wraps a stamped header band + the code leaf. The whole block is one
