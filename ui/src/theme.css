@@ -1047,6 +1047,10 @@ button.secondary {
   flex-direction: column;
   gap: 0; /* layers stack flush like real strata */
   position: relative;
+  /* Dark canyon shade BEHIND the rows: it shows through each row's stepped left margin
+     as the shadowed recess the stone step is carved out of, so the descending staircase
+     silhouette reads in high contrast against the lit rock rows stepping right. */
+  background: rgba(10, 14, 19, 0.5);
 }
 /* A single UNIFYING sandstone grain washed across the whole run column — the
    same faint fleck the field tablets wear — so the strata read as one authored,
@@ -1065,16 +1069,59 @@ button.secondary {
 }
 /* Keep row content + the active scan above the unifying grain wash. */
 .canyon > * { position: relative; z-index: 2; }
+/* A raking SUN-SHAFT down the whole run column: daylight catches the upper rim
+   ledges and fades into deepening canyon shadow at the bedrock floor, so the
+   column reads as an actual DESCENT — the further a layer sits down the wall,
+   the deeper into shade it falls. This is relative to the column height, so it
+   rakes top->bottom for a run of any length. Sits above the rows (z 3) but is
+   pointer-transparent and stays low-alpha, so click targets + AA contrast hold
+   (warm top only lightens the dark-ink cream rows; the floor shadow only deepens
+   the light-text maroon rows). The per-stage lit/shade steps below reinforce it. */
+.canyon::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 224, 160, 0.22) 0%,
+    rgba(255, 224, 160, 0.08) 12%,
+    rgba(255, 224, 160, 0) 26%,
+    rgba(14, 18, 24, 0) 50%,
+    rgba(12, 16, 22, 0.22) 78%,
+    rgba(6, 8, 12, 0.46) 100%
+  );
+}
 .strata-empty {
   padding: var(--s4);
 }
 .strata {
   position: relative;
   display: grid;
-  grid-template-columns: 84px 40px minmax(0, 1fr) auto auto auto;
+  /* The left "wall" track is widened to 100px at desktop/tablet so the carved
+     staircase has room for a BOLD per-stage rightward step (the lit ledge edge
+     marching down the column) while the rotated depth label stays centred in the
+     ≥40px that remains beyond the deepest tread. A narrow-width override below
+     pulls it back to 84px with a gentler step so the label never clips at 375. */
+  grid-template-columns: 36px 40px minmax(0, 1fr) auto auto auto;
   align-items: center;
   gap: var(--s3);
-  width: 100%;
+  /* px the staircase steps RIGHT per stage of depth: each row sets its depth index
+     --strata-i (0 rim → 7 bedrock) and the carved offset is index × --step-unit, so
+     the ramp is uniform and the whole staircase scales from this one token (retuned
+     at narrow widths below). At 8px desktop the bright nose marches 0→56px across the
+     column — a BOLD, unmistakable descent — while still leaving ≥44px of lit face for
+     the centred depth label and never reaching the sprite. --strata-i defaults to 0 so
+     an unindexed row stays flush. */
+  --step-unit: 8px;
+  --strata-i: 0;
+  --strata-step: calc(var(--strata-i) * var(--step-unit));
+  /* THE CARVED STAIRCASE: each deeper stage indents the whole row body right by
+     --strata-step, so the card edges march down-and-right into stone steps against the
+     dark canyon recess. No explicit width — as a flex child of .canyon the row stretches
+     to the column width MINUS this margin (width:100% would overflow past the margin). */
+  margin-left: var(--strata-step);
   text-align: left;
   padding: var(--s3) var(--s4) var(--s3) 0;
   color: var(--ink);
@@ -1084,10 +1131,48 @@ button.secondary {
      hard-edged bars. The depth/colour sequence still carries the geology; this
      just lowers the per-row edge noise so the column feels as composed as the
      carved sidebar tablets. (Regression rows below re-assert a hard fault edge.) */
-  box-shadow: inset 0 var(--px) 0 rgba(255, 240, 210, 0.12),
-    inset 0 calc(-1 * var(--px)) 0 rgba(0, 0, 0, 0.22);
+  box-shadow: inset 0 var(--px) 0 rgba(255, 240, 210, var(--strata-lit, 0.12)),
+    inset 0 calc(-1 * var(--px)) 0 rgba(0, 0, 0, var(--strata-shade, 0.22)),
+    /* lit left FACE of the stone step — reads as the sunlit riser against the dark recess */
+    inset calc(2 * var(--px)) 0 0 rgba(255, 246, 222, 0.5),
+    /* the ledge casts a shadow into the recess on its left + onto the step below */
+    -7px 2px 8px -3px rgba(0, 0, 0, 0.6);
   overflow: hidden;
 }
+/* PER-ROW DESCENT LIGHTING — the move that turns eight flat colored bars into a
+   wall that physically falls into shadow as it descends. A full-face overlay (not
+   just a 2px edge) carries BOTH a warm rim sun-catch at the top and a canyon-floor
+   shadow veil at the base, stepped per layer by depth:
+     --strata-catch : alpha of the warm sunlit top-sheen (rim ledges catch the most
+                      daylight). NONZERO ONLY on the light-cream, dark-ink upper rows
+                      so it only ever LIGHTENS a dark-text surface (contrast-safe).
+     --strata-veil  : alpha of the deep canyon-shadow veil filling the row face,
+                      ramping the further the layer sits down the wall. NONZERO ONLY
+                      on the light-text lower rows so it only ever DARKENS a
+                      light-text surface (contrast-safe — more contrast, not less).
+   Sits above the rock fill (z 0) but below the row content (z 1), so text is read
+   against the veiled face. Pointer-transparent; honoured statically (no motion). */
+.strata::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 234, 188, var(--strata-catch, 0)) 0%,
+      rgba(255, 234, 188, 0) 42%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(8, 10, 14, 0) 30%,
+      rgba(8, 10, 14, calc(var(--strata-veil, 0) * 0.55)) 70%,
+      rgba(6, 8, 12, var(--strata-veil, 0)) 100%
+    );
+}
+/* Keep row content + the active scan above the per-row descent overlay. */
+.strata > * { position: relative; z-index: 1; }
 /* When the row is a real <button>, strip the key-cap button chrome so it still
    reads as a stone layer (the rock styling above wins). */
 .strata.strata-btn {
@@ -1104,18 +1189,95 @@ button.secondary {
 .strata.strata-btn:active:not(:disabled) {
   transform: none;
 }
-/* The carved wall column: a stone block with a depth label etched into it. */
+/* THE CARVED DESCENDING STAIRCASE — the left wall track reads as a flight of stone
+   steps falling rim→bedrock. The signature is a HIGH-CONTRAST boundary that MARCHES
+   RIGHTWARD one step per stage: a genuinely DARK shadowed RECESS on the left, capped
+   at its right by a genuinely BRIGHT sunlit NOSE where the lit rock face begins. The
+   recess width = --strata-step (0 at the rim → bolder per stage to bedrock), so the
+   bright nose steps right down the column = the descent you can read with the verdict
+   slab cropped out. Built so the cue is the actual ROCK FACE / near-opaque warm sand
+   nose vs a near-opaque dark recess — NOT a low-alpha tint inside a dark gutter, so it
+   stays just as legible on the DARK maroon lower rows as on the light cream rim rows.
+   Layers, left→right: [dark recess (::before) — bright nose lip at its right edge] |
+   [cast shadow from the ledge above (::after) raked across the recess top] | [the LIT
+   rock face — the wall's own transparent-over-rock fill + warm sun sheen, carrying the
+   etched depth label]. The whole staircase lives INSIDE the wall track (100px desktop /
+   84px narrow) and the recess never reaches the lit-face/label zone or the sprite, so
+   nothing clips and the sprite/text stay fully lit at every width. */
 .strata-wall {
+  position: relative;
   align-self: stretch;
   display: flex;
   align-items: center;
   justify-content: center;
+  /* The wall is now just the slim gutter carrying the rotated depth label — the carved
+     staircase moved to the row body (margin-left). A dark carved-stone face that deepens
+     a touch with depth (--strata-shade) so the cream label keeps contrast on every rock
+     colour, with a sunlit inner edge where it meets the lit rock face to its right. */
   padding: 0 var(--s2);
-  background: rgba(0, 0, 0, 0.22);
-  border-right: var(--px) solid rgba(0, 0, 0, 0.4);
-  box-shadow: inset calc(-1 * var(--px)) 0 0 rgba(255, 240, 210, 0.15);
+  background: rgba(0, 0, 0, calc(0.18 + var(--strata-shade, 0.22) * 0.4));
+  border-right: var(--px) solid rgba(0, 0, 0, 0.34);
+  box-shadow: inset calc(-1 * var(--px)) 0 0 rgba(255, 240, 210, 0.1);
+}
+/* THE DARK SHADOWED RECESS + BRIGHT SUNLIT NOSE — the riser of the step, recessed in
+   shade, filling the wall from its left edge to the step offset (width --strata-step).
+   It is a genuinely DARK band (near-opaque black, deepest at its own left and easing
+   only slightly toward the nose) so it reads as a true shaded recess on EVERY rock
+   colour, light or dark. Its RIGHT edge is the carved stair edge: a crisp 4px BRIGHT
+   sunlit NOSE at high opacity (the lit rock face catching daylight where this step
+   begins), with a dark fault tucked just behind it for chisel depth. Because
+   --strata-step grows per stage, this dark-recess→bright-nose boundary marches RIGHT
+   down the column = the descending stair, and the contrast holds because neither the
+   recess darkness nor the nose brightness is dimmed by depth — only the OFFSET steps.
+   Pointer-transparent, behind the depth label. Zero width (invisible) on the rim. */
+.strata-wall::before {
+  content: none; /* retired — the staircase is now the ROW BODY stepping right (margin-left) */
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--strata-step, 0px);
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.82) 0%,
+    rgba(0, 0, 0, 0.66) 65%,
+    rgba(0, 0, 0, 0.5) 100%
+  );
+  /* The carved stair edge at the recess's right: a crisp BRIGHT sunlit nose (4px, held
+     at high, depth-independent opacity so it stays unmistakable on the dark lower rows
+     AND survives the page downscale), with a thin dark fault tucked behind it for
+     chisel depth, plus a soft dark base so the recess reads as a riser with thickness. */
+  box-shadow:
+    inset calc(-4 * var(--px)) 0 0 rgba(255, 247, 226, 0.95),
+    inset calc(-5 * var(--px)) 0 0 rgba(0, 0, 0, 0.6),
+    inset 0 calc(-1 * var(--px)) 0 rgba(0, 0, 0, 0.5);
+}
+/* THE OVERHANG CAST SHADOW: the short shadow the ledge ABOVE drops down onto THIS
+   step's recess, so each step physically overhangs the one below. Rendered on the
+   lower row (never clipped by the upper row's overflow) as a dark gradient raked
+   across the TOP of the recess band, deepest at the top and fading down the riser.
+   Confined to the recess width, so it vanishes on the rim where nothing sits above. */
+.strata-wall::after {
+  content: none; /* retired — see ::before; staircase moved to the row body */
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: calc(8 * var(--px));
+  width: var(--strata-step, 0px);
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.55) 0%,
+    rgba(0, 0, 0, 0.3) 50%,
+    rgba(0, 0, 0, 0) 100%
+  );
 }
 .strata-depth {
+  position: relative;
+  z-index: 1; /* the etched label rides above the carved step band */
   font-family: var(--mono);
   font-size: 10px;
   font-weight: 700;
@@ -1142,34 +1304,94 @@ button.secondary {
    of pipeline) down to deep-maroon bedrock (decision). The light cream/ochre
    bands keep dark --ink for AA contrast; the vermilion/red/maroon bands switch
    to light --sand. Each stage owns its own layer; none are reused. */
+/* --strata-lit / --strata-shade STEP the chiseled top-light + base-shadow by
+   depth: the rim ledge (spec) catches the most daylight and casts the least
+   shadow; each layer down loses light and gains shadow until bedrock (decision)
+   sits in near-full shade. This breaks the row-to-row uniformity into a felt
+   descent and reinforces the column sun-shaft above. */
+/* --strata-catch (warm rim sun, dark-ink rows only) steps DOWN from the rim;
+   --strata-veil (canyon-shadow, light-text rows only) ramps UP toward bedrock.
+   The two never overlap on one row, so each row only moves contrast the safe way. */
+/* --strata-step STEPS the carved ledge offset by depth: each row sets only its
+   DEPTH INDEX --strata-i (0 at the rim → 7 at bedrock) and the step is computed
+   --strata-i × --step-unit, so the staircase ramp is uniform and scales from one
+   token (--step-unit: 8px desktop → 0..56px; retuned to 5px at narrow widths so the
+   84px track keeps room for its centred depth label). Driving the step off the
+   s-<stage> class (not nth-child) means the history view — which renders rows in no
+   fixed stage order — still gets the correct per-stage recess. Drives .strata-wall
+   padding + the ::before dark recess/bright nose and ::after overhang cast shadow. */
 .strata.s-spec {
   background: var(--strata-1); /* limestone cream — dark ink */
+  --strata-lit: 0.22;
+  --strata-shade: 0.10;
+  --strata-catch: 0.42; /* rim ledge — full daylight */
+  --strata-i: 0; /* rim — the staircase starts flush at the top */
 }
 .strata.s-observe {
   background: var(--strata-2); /* pale ochre-cream — dark ink */
+  --strata-lit: 0.18;
+  --strata-shade: 0.14;
+  --strata-catch: 0.26;
+  --strata-i: 1;
 }
 .strata.s-generate {
   background: var(--strata-3); /* pale ochre — dark ink */
+  --strata-lit: 0.15;
+  --strata-shade: 0.18;
+  --strata-catch: 0.12; /* last lit ledge before the light drops into the wall */
+  --strata-i: 2;
 }
 .strata.s-run {
   background: var(--strata-4); /* vermilion — light text */
   color: var(--sand);
+  --strata-lit: 0.12;
+  --strata-shade: 0.22;
+  --strata-veil: 0.14; /* shadow begins as the wall closes overhead */
+  --strata-i: 3;
 }
 .strata.s-diagnose {
   background: var(--strata-5); /* red-orange — light text */
   color: var(--sand);
+  --strata-lit: 0.09;
+  --strata-shade: 0.27;
+  --strata-veil: 0.26;
+  --strata-i: 4;
 }
 .strata.s-repair {
   background: var(--strata-6); /* red rust — light text */
   color: var(--sand);
+  --strata-lit: 0.07;
+  --strata-shade: 0.31;
+  --strata-veil: 0.38;
+  --strata-i: 5;
 }
 .strata.s-pr {
   background: var(--strata-7); /* oxblood — light text */
   color: var(--sand);
+  --strata-lit: 0.05;
+  --strata-shade: 0.37;
+  --strata-veil: 0.50;
+  --strata-i: 6;
 }
 .strata.s-decision {
   background: var(--strata-8); /* deep maroon — light text */
   color: var(--sand);
+  --strata-lit: 0.03;
+  --strata-shade: 0.44;
+  --strata-veil: 0.62; /* bedrock — near-full canyon-floor shade */
+  --strata-i: 7; /* bedrock — deepest carved offset */
+}
+/* Narrow widths (phones, incl. 375): the staircase reads boldest at desktop/tablet
+   and turns GENTLER here so the slim wall track never crowds the rotated depth label
+   or pushes row text. The wall pulls back to 84px and the per-stage step drops to
+   5px (0..35px at bedrock), leaving ~49px centred for the etched label even on the
+   deepest recess. Everything else (dark recess, bright nose, cast shadow) holds, just
+   shorter — the nose stays crisp because its opacity is depth-independent. */
+@media (max-width: 560px) {
+  .strata {
+    grid-template-columns: 32px 40px minmax(0, 1fr) auto auto auto;
+    --step-unit: 4px;
+  }
 }
 .strata.clickable {
   cursor: pointer;
@@ -1367,6 +1589,7 @@ button.secondary {
   content: '';
   position: absolute;
   inset: 0;
+  z-index: 2; /* the running-layer scan rides above the per-row descent overlay */
   background: linear-gradient(
     90deg,
     transparent 0%,
