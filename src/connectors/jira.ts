@@ -7,6 +7,12 @@ export interface JiraSourceConfig {
   mcp: McpServerConfig;
   /** Tool name to call for a JQL search; defaults to the common `jira_search`. */
   tool?: string;
+  /** The argument key the tool expects the JQL under; defaults to `jql` (some
+   *  servers use e.g. `query` or `jqlQuery`). */
+  jqlParam?: string;
+  /** Extra static arguments merged into the tool call (e.g. { maxResults: 50,
+   *  fields: ['summary', 'description'] }). The resolved JQL always wins over these. */
+  args?: Record<string, unknown>;
 }
 
 export interface RawJiraIssue {
@@ -45,7 +51,8 @@ export function issuesToStories(issues: RawJiraIssue[]): MappedStory[] {
 /** Pull Jira issues via a configured Jira MCP server (JQL) and map them to stories. */
 export async function fetchJiraStories(config: JiraSourceConfig): Promise<MappedStory[]> {
   const issues = await withMcpClient(config.mcp, async (client) => {
-    const text = await callToolText(client, config.tool ?? 'jira_search', { jql: config.jql });
+    const args = { ...config.args, [config.jqlParam ?? 'jql']: config.jql };
+    const text = await callToolText(client, config.tool ?? 'jira_search', args);
     const parsed = text ? JSON.parse(text) : [];
     return (Array.isArray(parsed) ? parsed : (parsed.issues ?? [])) as RawJiraIssue[];
   });

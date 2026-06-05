@@ -16,7 +16,7 @@ import { runDemoWithServer } from '../pipeline/demo.js';
 import { startDemoServer, stopProcessTree, withVariant } from '../pipeline/demoServer.js';
 import { runStoryPipeline } from '../pipeline/story.js';
 import { getProject, listProjects, saveProject } from '../projects/store.js';
-import { Project } from '../projects/types.js';
+import { Project, StorySource } from '../projects/types.js';
 import { addStory } from '../stories/store.js';
 import { createRepairPr } from '../pr/createRepairPr.js';
 import { applyRepair } from '../repair/applyPatch.js';
@@ -145,6 +145,77 @@ program
     console.log(`Demo report ${result.reportPath}`);
   });
 
+/** Commander collector for repeatable options (e.g. --header a --header b -> [a, b]). */
+const collect = (value: string, previous: string[]): string[] => previous.concat([value]);
+
+/** Parse repeated "key<sep>value" flags into an object (e.g. "Authorization: Bearer x"
+ *  with sep ":", or "TOKEN=abc" with sep "="). Splits on the FIRST separator only. */
+function parseKeyValues(pairs: string[], sep: string): Record<string, string> | undefined {
+  const out: Record<string, string> = {};
+  for (const pair of pairs) {
+    const idx = pair.indexOf(sep);
+    if (idx === -1) continue;
+    out[pair.slice(0, idx).trim()] = pair.slice(idx + 1).trim();
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** Build an McpServerConfig from add-source flags: --url => remote http/sse, else
+ *  --command => local stdio. Returns undefined when neither is given. */
+function mcpConfigFromOptions(options: AddSourceOptions): Record<string, unknown> | undefined {
+  if (options.url) {
+    const transport = options.transport === 'sse' ? 'sse' : 'http';
+    const headers = parseKeyValues(options.header, ':');
+    return { transport, url: options.url, ...(headers ? { headers } : {}) };
+  }
+  if (options.command) {
+    const env = parseKeyValues(options.env, '=');
+    return {
+      command: options.command,
+      ...(options.arg.length ? { args: options.arg } : {}),
+      ...(env ? { env } : {})
+    };
+  }
+  return undefined;
+}
+
+/** Assemble a source `config` object from flags for a jira/github source. */
+function sourceConfigFromOptions(type: string, options: AddSourceOptions): Record<string, unknown> | undefined {
+  const mcp = mcpConfigFromOptions(options);
+  if (type === 'jira') {
+    return {
+      ...(options.jql ? { jql: options.jql } : {}),
+      ...(options.tool ? { tool: options.tool } : {}),
+      ...(mcp ? { mcp } : {})
+    };
+  }
+  if (type === 'github') {
+    return {
+      ...(options.owner ? { owner: options.owner } : {}),
+      ...(options.repo ? { repo: options.repo } : {}),
+      ...(options.label ? { label: options.label } : {}),
+      ...(mcp ? { mcp } : {})
+    };
+  }
+  return undefined;
+}
+
+interface AddSourceOptions {
+  type: string;
+  config?: string;
+  url?: string;
+  transport?: string;
+  header: string[];
+  command?: string;
+  arg: string[];
+  env: string[];
+  jql?: string;
+  tool?: string;
+  owner?: string;
+  repo?: string;
+  label?: string;
+}
+
 const projectCmd = program.command('project').description('Manage connected projects');
 
 projectCmd
@@ -183,6 +254,55 @@ projectCmd
     };
     const file = await saveProject(project);
     console.log(`Saved project ${id} → ${file}`);
+  });
+
+projectCmd
+  .command('add-source')
+  .description('Attach a story source to a project (no hand-editing the project JSON)')
+  .argument('<project-id>')
+  .requiredOption('--type <type>', 'Source type: jira, github, or upload')
+  .option('--config <json>', 'Full source config as JSON (escape hatch; wins over the flags below)')
+  .option('--url <url>', 'Remote MCP endpoint URL (selects an http/sse transport)')
+  .option('--transport <kind>', 'Transport for --url: http (default) or sse')
+  .option('--header <kv>', 'Header for the remote MCP server, "Key: Value" (repeatable)', collect, [])
+  .option('--command <command>', 'Command to launch a local stdio MCP server')
+  .option('--arg <arg>', 'Argument for the stdio --command (repeatable)', collect, [])
+  .option('--env <kv>', 'Env var for the stdio server, "KEY=value" (repeatable)', collect, [])
+  .option('--jql <jql>', 'JQL query (jira)')
+  .option('--tool <tool>', 'Tool name to call (jira; default jira_search)')
+  .option('--owner <owner>', 'Repo owner (github)')
+  .option('--repo <repo>', 'Repo name (github)')
+  .option('--label <label>', 'Issue label filter (github)')
+  .action(async (projectId: string, options: AddSourceOptions) => {
+    const project = await getProject(projectId);
+    if (!project) {
+      console.error(`Unknown project: ${projectId}`);
+      process.exitCode = 1;
+      return;
+    }
+    const type = options.type;
+    if (type !== 'jira' && type !== 'github' && type !== 'upload') {
+      console.error(`Unknown source type: ${type} (expected jira, github, or upload)`);
+      process.exitCode = 1;
+      return;
+    }
+    let config: Record<string, unknown> | undefined;
+    if (options.config) {
+      try {
+        config = JSON.parse(options.config) as Record<string, unknown>;
+      } catch (error) {
+        console.error(`--config is not valid JSON: ${(error as Error).message}`);
+        process.exitCode = 1;
+        return;
+      }
+    } else {
+      config = sourceConfigFromOptions(type, options);
+    }
+    const source: StorySource = { type, ...(config && Object.keys(config).length ? { config } : {}) };
+    // Replace any existing source of the same type so re-running updates it in place.
+    project.sources = [...project.sources.filter((entry) => entry.type !== type), source];
+    const file = await saveProject(project);
+    console.log(`Added ${type} source to ${projectId} → ${file}`);
   });
 
 const specCmd = program.command('spec').description('Add and run testing stories');
