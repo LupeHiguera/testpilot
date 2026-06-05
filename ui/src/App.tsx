@@ -6,6 +6,8 @@ import { PixelWordmark } from './PixelWordmark';
 import { CanyonAtmosphere, type SkyPhase } from './CanyonAtmosphere';
 import { ChromeGlyph, StageSprite, StatusMark } from './PixelSprites';
 import type { DocsModel, PipelineEvent, Project, RunSummary, Stage, Status, Story, StoryStatus } from './types';
+import { collectJudgments, deriveVerdict, fmtElapsed, rowDatum } from './runModel';
+import type { Diagnosis, JudgmentCall, VerdictView } from './runModel';
 
 const STAGE_NAME: Record<Stage, string> = {
   spec: 'Spec',
@@ -50,12 +52,6 @@ const CONN_LABEL: Record<string, string> = {
   closed: 'Stream closed'
 };
 
-interface Diagnosis {
-  category?: string;
-  confidence?: number;
-  reason?: string;
-  repairable?: boolean;
-}
 
 export function App() {
   const { events, connection } = useEventStream();
@@ -342,96 +338,6 @@ function RunListSkeleton() {
 }
 
 /** Pull the run-level verdict out of the live event stream, if available. */
-function deriveVerdict(events: PipelineEvent[]) {
-  const diagnoses = events
-    .filter((e) => e.stage === 'diagnose' && e.data?.diagnosis)
-    .map((e) => e.data!.diagnosis as Diagnosis);
-  const regression = diagnoses.find((d) => d.category === 'PRODUCT_REGRESSION');
-  const repairEvent = events.find((e) => e.stage === 'repair');
-  const repairApplied = repairEvent ? repairEvent.status === 'pass' : false;
-  const repairRefused = repairEvent?.status === 'info';
-  const decision = events.find((e) => e.stage === 'decision' && e.status !== 'start');
-
-  if (!decision && !repairEvent && diagnoses.length === 0) {
-    return null;
-  }
-  return {
-    category: regression?.category ?? diagnoses[0]?.category,
-    repairApplied,
-    repairRefused,
-    failed: decision?.status === 'fail',
-    done: Boolean(decision)
-  };
-}
-
-interface VerdictView {
-  tone: 'error' | 'repaired' | 'guarded';
-  mark: Status;
-  headline: string;
-  category?: string;
-  note: string;
-  done: boolean; // true once the verdict is final (drives the sunset reveal)
-}
-
-/** One side of the judgment ledger: a single call (repaired / refused) with the
- *  REAL reasoning + evidence that produced it, pulled straight from the events. */
-interface JudgmentCall {
-  kind: 'repaired' | 'refused';
-  category?: string;
-  title: string;
-  verdict: string; // the short stamp word: "auto-repaired" / "refused"
-  reason?: string; // the diagnosis reasoning (real model/heuristic text)
-  detail?: string; // the repair reasoning, when present
-  diff?: string;
-  before?: string;
-  after?: string;
-}
-
-/**
- * Gather the two contrasting judgments (safe drift -> repaired, real regression
- * -> refused) WITH their evidence from the live pipeline events, so the verdict
- * moment surfaces the *why* — not just a status word. All fields are real:
- *  - diagnose rows carry the diagnosis (category, reason, repairable, confidence)
- *  - the repair row carries diff + reason + before/after screenshots
- */
-function collectJudgments(events: PipelineEvent[]): JudgmentCall[] {
-  const calls: JudgmentCall[] = [];
-  const diagnoses = events
-    .filter((e) => e.stage === 'diagnose' && e.data?.diagnosis)
-    .map((e) => e.data!.diagnosis as Diagnosis);
-  const repair = events.find((e) => e.stage === 'repair' && e.status !== 'start');
-  const repairApplied = repair?.status === 'pass';
-
-  // Safe drift: the copy-change that was auto-repaired (or refused if no patch).
-  const driftDiag = diagnoses.find((d) => d.repairable) ?? diagnoses.find((d) => d.category === 'UI_COPY_CHANGE');
-  if (driftDiag || repair) {
-    const rd = repair?.data ?? {};
-    calls.push({
-      kind: repairApplied ? 'repaired' : 'refused',
-      category: driftDiag?.category,
-      title: 'Safe drift',
-      verdict: repairApplied ? 'auto-repaired' : 'left as-is',
-      reason: driftDiag?.reason,
-      detail: typeof rd.reason === 'string' ? rd.reason : undefined,
-      diff: typeof rd.diff === 'string' ? rd.diff : undefined,
-      before: typeof rd.beforeScreenshot === 'string' ? rd.beforeScreenshot : undefined,
-      after: typeof rd.afterScreenshot === 'string' ? rd.afterScreenshot : undefined
-    });
-  }
-
-  // Real regression: the call that was refused to avoid weakening the test.
-  const regDiag = diagnoses.find((d) => d.category === 'PRODUCT_REGRESSION');
-  if (regDiag) {
-    calls.push({
-      kind: 'refused',
-      category: regDiag.category,
-      title: 'Product regression',
-      verdict: 'repair refused',
-      reason: regDiag.reason
-    });
-  }
-  return calls;
-}
 
 /** The big stamped seal phrase, keyed to the verdict tone — the unmissable line
  *  pressed into the bedrock. Reads as an expedition stamp, not a footer note. */
@@ -674,13 +580,6 @@ function verdictFor(view: VerdictView): { phase: SkyPhase; done: boolean } {
   return { phase, done: view.done };
 }
 
-/** Format a millisecond span as a compact elapsed clock (e.g. 0:04, 1:12). */
-function fmtElapsed(ms: number): string {
-  const total = Math.max(0, Math.round(ms / 1000));
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
 
 /**
  * Live elapsed clock. While the run is in flight, re-render every second so the
@@ -880,36 +779,6 @@ function CanyonHorizon({ running, done, phase }: { running: boolean; done: boole
  * captured counts, bundle path), so they don't get a second chip. Start rows and
  * anything without a meaningful datum return null.
  */
-function rowDatum(event: PipelineEvent): { text: string; kind: 'ok' | 'no' | 'neutral' } | null {
-  if (event.status === 'start') return null;
-  const data = event.data ?? {};
-  const scenario = typeof data.scenario === 'string' ? data.scenario : undefined;
-  const diagnosis = data.diagnosis as Diagnosis | undefined;
-
-  if (event.stage === 'diagnose' && diagnosis) {
-    const conf =
-      typeof diagnosis.confidence === 'number'
-        ? `${Math.round(diagnosis.confidence <= 1 ? diagnosis.confidence * 100 : diagnosis.confidence)}% conf`
-        : undefined;
-    const repair = diagnosis.repairable ? 'repairable' : 'repair refused';
-    return {
-      text: [conf, repair].filter(Boolean).join(' · '),
-      kind: diagnosis.repairable ? 'ok' : 'no'
-    };
-  }
-  if (event.stage === 'run') {
-    const verdict = event.status === 'pass' ? 'pass' : event.status === 'fail' ? 'fail' : event.status;
-    return {
-      text: [scenario, verdict].filter(Boolean).join(' · '),
-      kind: event.status === 'pass' ? 'ok' : event.status === 'fail' ? 'no' : 'neutral'
-    };
-  }
-  if (event.stage === 'repair') {
-    const applied = event.status === 'pass';
-    return { text: applied ? 'applied' : 'refused', kind: applied ? 'ok' : 'no' };
-  }
-  return null;
-}
 
 function Strata({ event, active }: { event: PipelineEvent; active: boolean }) {
   const [open, setOpen] = useState(false);
