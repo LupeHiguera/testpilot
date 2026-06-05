@@ -186,6 +186,47 @@ body {
   background-attachment: fixed;
 }
 
+/* AMBIENT CANYON WALLS: quiet warm-rock bands fixed to the left & right viewport
+   edges so the centered content reads as seen FROM the canyon floor, framed by
+   walls receding into the gorge — the "quiet ambient frame", not the full-bleed
+   CanyonGorge that was retired for fighting the layout. It sits BEHIND the app
+   (z 0; .app is z 1) and is pointer-transparent, so it only fills the margins
+   beside the 1200px content column and never touches a click target or any text.
+   Each wall is a warm rock face that fades to nothing well before the content. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+        90deg,
+        rgba(46, 24, 17, 0.62) 0%,
+        rgba(72, 39, 27, 0.34) 34%,
+        rgba(96, 54, 36, 0.12) 62%,
+        transparent 100%
+      )
+      left center / 15% 100% no-repeat,
+    linear-gradient(
+        270deg,
+        rgba(46, 24, 17, 0.62) 0%,
+        rgba(72, 39, 27, 0.34) 34%,
+        rgba(96, 54, 36, 0.12) 62%,
+        transparent 100%
+      )
+      right center / 15% 100% no-repeat;
+}
+/* Narrow screens: the content goes full-width, so pull the walls to a thin, faint
+   sliver at the very edges — present as a frame, never creeping under the content. */
+@media (max-width: 880px) {
+  body::before {
+    background:
+      linear-gradient(90deg, rgba(46, 24, 17, 0.5) 0%, transparent 100%) left center / 7% 100% no-repeat,
+      linear-gradient(270deg, rgba(46, 24, 17, 0.5) 0%, transparent 100%) right center / 7% 100% no-repeat;
+  }
+}
+
 img {
   image-rendering: pixelated; /* crisp pixel-art rendering for sprites & shots */
 }
