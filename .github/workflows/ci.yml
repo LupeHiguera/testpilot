@@ -38,6 +38,9 @@ jobs:
       - name: End-to-end demo (mock mode)
         run: npm run testpilot -- demo --mode mock
 
+      - name: Perf budget (dashboard load + DOM size)
+        run: npm run perf:budget
+
       - name: Upload run artifacts
         if: always()
         uses: actions/upload-artifact@v7

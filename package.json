@@ -12,6 +12,7 @@
     "serve": "tsx src/cli/index.ts serve",
     "ui:dev": "vite --config ui/vite.config.ts",
     "ui:build": "vite build --config ui/vite.config.ts",
+    "perf:budget": "node --import tsx tools/perf-budget.ts",
     "typecheck:ui": "tsc --noEmit -p ui/tsconfig.json",
     "build": "tsc --noEmit && npm run typecheck:ui",
     "test": "vitest run --config vitest.config.ts",

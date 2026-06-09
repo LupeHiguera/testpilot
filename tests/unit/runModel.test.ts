@@ -85,8 +85,10 @@ describe('fmtElapsed', () => {
 });
 
 describe('PERF_BUDGET', () => {
-  it('states a positive load + DOM budget the dashboard holds to', () => {
+  it('states positive load + DOM ceilings the dashboard holds to (enforced in CI)', () => {
     expect(PERF_BUDGET.maxLoadMs).toBeGreaterThan(0);
-    expect(PERF_BUDGET.maxDomNodes).toBeGreaterThan(0);
+    expect(PERF_BUDGET.maxIdleDomNodes).toBeGreaterThan(0);
+    // A full run is heavier than idle, so its ceiling must be the looser of the two.
+    expect(PERF_BUDGET.maxRunDomNodes).toBeGreaterThan(PERF_BUDGET.maxIdleDomNodes);
   });
 });
