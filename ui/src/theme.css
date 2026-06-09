@@ -1624,8 +1624,63 @@ button.secondary {
   border-color: var(--rim);
 }
 
-/* active = currently-running layer: a smooth linear "stone scan" sweeping a
-   band of light across the layer (no strobe; continuous linear timing). */
+/* active = currently-running layer. Two cues stack so the live ledge reads at a
+   glance AND in a frozen frame:
+   1. a PERSISTENT sun frame + soft outer glow on the ledge itself (always present
+      in a still — it does not animate, so it never catches the eye mid-fade), and
+   2. the linear "stone scan" sweep below + the breathing pip beacon, which carry
+      the motion. The frame is merged with the base staircase shadows so the carved
+      step lighting is preserved. */
+.strata.active {
+  box-shadow:
+    inset 0 0 0 calc(2 * var(--px)) var(--sun),
+    inset 0 var(--px) 0 rgba(255, 240, 210, 0.18),
+    inset 0 calc(-1 * var(--px)) 0 rgba(0, 0, 0, 0.22),
+    -7px 2px 8px -3px rgba(0, 0, 0, 0.6),
+    0 0 14px -3px rgba(255, 225, 153, 0.45);
+}
+/* The breathing LIVE beacon on the active ledge — a sun-gold pip that pulses
+   between two NON-ZERO intensities (never to zero) so the glow is present in any
+   captured frame, plus a small carved "live · working" label. */
+.strata-live {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start; /* hug the label, don't stretch the row width */
+  gap: var(--s2);
+  margin-top: var(--s1);
+  /* A dark carved chip so the bright label keeps strong contrast on ANY ledge
+     colour (the active ledge itself washes gold — sun-on-gold was too faint). */
+  padding: 2px 7px;
+  background: rgba(9, 11, 15, 0.58);
+  box-shadow: inset 0 0 0 var(--px) rgba(255, 225, 153, 0.55);
+  font-family: var(--mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--sun-bright);
+  text-shadow: 0 var(--px) 0 rgba(0, 0, 0, 0.6);
+}
+.strata-live-pip {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  background: var(--sun-bright);
+  box-shadow: 0 0 6px var(--sun);
+  animation: strata-live-pulse 1.4s ease-in-out infinite;
+}
+@keyframes strata-live-pulse {
+  0%,
+  100% {
+    opacity: 0.6;
+    box-shadow: 0 0 4px var(--sun);
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 11px var(--sun-bright);
+    transform: scale(1.18);
+  }
+}
 .strata.active::after {
   content: '';
   position: absolute;
@@ -3670,6 +3725,7 @@ button.secondary {
   .atmo-sun .sun-glow,
   .is-settled .sun-corona,
   .gauge-num.num-pulse,
+  .strata-live-pip,
   .atmo-bird,
   .atmo-dust,
   .spine-stack.is-active .spine-ember,

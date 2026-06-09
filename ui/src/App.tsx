@@ -843,6 +843,17 @@ function Strata({ event, active }: { event: PipelineEvent; active: boolean }) {
         <span className="stage">{STAGE_NAME[event.stage]}</span>
         <span className="label">{event.label}</span>
         {datum && <span className={`row-datum datum-${datum.kind}`}>{datum.text}</span>}
+        {/* A persistent live beacon pinned to the in-flight ledge: a breathing
+            sun-gold pip + label so even a frozen frame lands the eye on exactly
+            which layer the run is working right now (the scan sweep alone is
+            transient and can be mid-fade in a still). Reduced-motion holds the
+            pip solid (see theme.css). */}
+        {active && (
+          <span className="strata-live" role="status">
+            <span className="strata-live-pip" aria-hidden />
+            live · working
+          </span>
+        )}
       </span>
       {category && (
         <span className={`tag tag-${isRegression ? 'regression' : 'copy'} strata-tag`}>
