@@ -40,24 +40,63 @@ test('${intent.name}', async ({ page }) => {
     testContent: string;
     diagnosis: Diagnosis;
     runResult: RunResult;
-    // Accepted for contract parity; the mock stays deterministic and does not
-    // use the observation, so reproducible runs/CI are unaffected.
+    // The fresh page observation the repair loop takes before proposing; the mock
+    // grounds its repair in the CURRENT buttons so the fix is real, not hard-coded.
     observation?: ObservationArtifacts;
   }): Promise<RepairProposal> {
-    const repaired = input.testContent.replace(
-      /await page\.getByRole\('button', \{ name: 'Sign in' \}\)\.click\(\);/,
-      "await page.getByRole('button', { name: /^(Sign in|Log in)$/ }).click();"
-    );
-    const changed = repaired !== input.testContent;
+    // Prefer the fresh observation's buttons; fall back to the failure artifacts.
+    const presentButtons = input.observation?.buttons ?? input.runResult.failureArtifacts?.buttons ?? [];
+    const repair = widenSubmitLocator(input.testContent, presentButtons);
     return {
       category: input.diagnosis.category,
-      reason: changed ? 'Replace brittle submit-button copy selector with a role locator that preserves the submit action.' : 'No safe generated-test repair was found.',
+      reason: repair
+        ? `Widen the brittle "${repair.oldLabel}" submit selector to a role locator that matches both the old label and the page's current "${repair.newLabel}" button, preserving the submit action and every assertion.`
+        : 'No safe generated-test repair was found (the driven control could not be matched to a current button).',
       originalPath: input.testPath,
-      proposedContent: repaired,
-      diff: changed ? createPatch(input.testPath, input.testContent, repaired) : '',
-      safeToApply: changed
+      proposedContent: repair ? repair.content : input.testContent,
+      diff: repair ? createPatch(input.testPath, input.testContent, repair.content) : '',
+      safeToApply: Boolean(repair)
     };
   }
+}
+
+function escapeForRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Generalised safe repair for a relabelled submit control. Finds a
+ * `getByRole('button', { name: 'OLD' })` the test DRIVES whose label is no longer
+ * among the page's current buttons, and widens it to a role locator matching BOTH
+ * the old label and the equivalent current button — so a copy change is repaired
+ * on ANY flow, not just the login demo's `Sign in` -> `Log in`. The widened locator
+ * still preserves the original label (in case it returns) and touches nothing else,
+ * so validatePatch's assertion/route guards still hold. Returns null when no driven
+ * control maps to a current button (no fabricated repair).
+ */
+function widenSubmitLocator(
+  testContent: string,
+  presentButtons: string[]
+): { content: string; oldLabel: string; newLabel: string } | null {
+  const present = presentButtons.map((button) => button.trim()).filter(Boolean);
+  const presentLower = present.map((button) => button.toLowerCase());
+  const locator = /getByRole\((['"])button\1,\s*\{\s*name:\s*(['"])([^'"]+)\2\s*\}\)/g;
+
+  for (let match = locator.exec(testContent); match; match = locator.exec(testContent)) {
+    const oldLabel = match[3];
+    if (presentLower.includes(oldLabel.toLowerCase())) {
+      continue; // the driven control is still on the page → not a relabel
+    }
+    const newLabel = present.find((button) => button.toLowerCase() !== oldLabel.toLowerCase());
+    if (!newLabel) {
+      continue; // no current button to map the drifted label onto
+    }
+    const alternatives = [oldLabel, newLabel].map(escapeForRegex).join('|');
+    const replacement = `getByRole('button', { name: /^(${alternatives})$/ })`;
+    const content = testContent.slice(0, match.index) + replacement + testContent.slice(match.index + match[0].length);
+    return { content, oldLabel, newLabel };
+  }
+  return null;
 }
 
 function createPatch(filePath: string, before: string, after: string) {

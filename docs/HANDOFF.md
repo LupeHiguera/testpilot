@@ -51,15 +51,19 @@ GitHub/Jira MCP story ingestion; living docs. See `README.md` for the full pictu
   `src/mcp/client.ts` (+ http/sse transport), `src/connectors/{github,jira}.ts`.
 
 ## Roadmap (next, in priority order)
-1. **Phase 1 — generalize diagnosis (DONE) → next, generalize REPAIR.** The
-   classifier now derives app-agnostic structured signals (`src/diagnosis/failureSignals.ts`):
-   it parses *which assertion failed* and *which control the test reached for* from
-   the Playwright error (stripping the echoed source so a later `toHaveURL` line
-   can't masquerade as the failure), and reads the re-observed page — no longer
-   keyed on `intent.submitText`. A failed outcome assertion is always a refused
-   regression; only a control-lookup drift is repairable. Remaining: the REPAIR
-   proposer (mock `proposeRepair`) is still login-shaped — generalize it to rewrite
-   any drifted locator, not just the `Sign in`→role-regex swap.
+1. **Phase 1 — generalize diagnosis + repair (DONE).** Diagnosis derives app-agnostic
+   structured signals (`src/diagnosis/failureSignals.ts`): it parses *which assertion
+   failed* and *which control the test reached for* from the Playwright error
+   (stripping the echoed source so a later `toHaveURL` line can't masquerade as the
+   failure) and reads the re-observed page — no longer keyed on `intent.submitText`.
+   A failed outcome assertion is always a refused regression; only a control-lookup
+   drift is repairable. The mock `proposeRepair` now widens whichever
+   `getByRole('button', { name })` the test drives whose label is gone from the
+   page's CURRENT buttons (from the loop's fresh observation) to a role locator
+   matching both old and current — a copy-change is repaired on ANY flow, and no
+   repair is fabricated when nothing maps. Known limit: the relabel repair sources
+   new labels from `observation.buttons`, so non-button controls (links) need the
+   artifact collector to capture them first.
 2. **Phase 2 — close the connected-repo loop.** Repairs auto-apply only inside
    `tests/generated/`; generalize safe-apply into an external repo behind the existing
    PR-bundle gate (`src/pr/createRepairPr.ts`).
