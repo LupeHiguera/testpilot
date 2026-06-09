@@ -18,7 +18,9 @@ export function validatePatch(
 ): { valid: boolean; reason: string } {
   const normalizedPath = path.resolve(proposal.originalPath);
   const generatedRoot = path.resolve(generatedTestsDir);
-  if (!normalizedPath.startsWith(generatedRoot)) {
+  // Require a path strictly inside the generated-tests dir. The trailing separator
+  // matters: a bare startsWith would also accept a sibling like `tests/generated-x`.
+  if (!normalizedPath.startsWith(generatedRoot + path.sep)) {
     return { valid: false, reason: 'Repairs may only edit generated tests.' };
   }
   if (!diagnosis.repairable || !safeCategories.has(diagnosis.category)) {

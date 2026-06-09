@@ -94,83 +94,139 @@ function handleSse(req: http.IncomingMessage, res: http.ServerResponse) {
   });
 }
 
-function triggerRun(req: http.IncomingMessage, res: http.ServerResponse) {
-  let body = '';
-  req.on('data', (chunk) => {
-    body += chunk;
-  });
-  req.on('end', () => {
-    let mode: ModelMode = 'mock';
-    try {
-      const parsed = body ? JSON.parse(body) : {};
-      if (parsed.mode === 'openai') {
-        mode = 'openai';
+// Cap on a request body. The server is a local dev tool, but an unbounded
+// `body += chunk` would let any client (or a runaway script) buffer the process
+// out of memory; 1 MB is far more than any control payload needs.
+const MAX_BODY_BYTES = 1_000_000;
+
+/**
+ * CSRF guard for the mutating endpoints. The server binds to 127.0.0.1, but a web
+ * page you have open in a browser can still fire a cross-origin POST at it (a
+ * "simple" request needs no preflight), which would spawn the demo app + a real
+ * run on your machine. So a POST that carries an `Origin` is only accepted when
+ * that origin is localhost. Non-browser callers (the CLI, curl) send no Origin and
+ * are unaffected.
+ */
+function originIsLocal(req: http.IncomingMessage): boolean {
+  const origin = req.headers.origin;
+  if (!origin) {
+    return true; // no browser origin → not a cross-site request
+  }
+  try {
+    const host = new URL(origin).hostname;
+    return host === '127.0.0.1' || host === 'localhost' || host === '::1';
+  } catch {
+    return false;
+  }
+}
+
+/** Read a request body to a string, rejecting once it exceeds MAX_BODY_BYTES. */
+function readBody(req: http.IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    let size = 0;
+    let done = false;
+    req.on('data', (chunk) => {
+      if (done) return;
+      size += chunk.length;
+      if (size > MAX_BODY_BYTES) {
+        done = true;
+        reject(new Error('BODY_TOO_LARGE'));
+        return;
       }
-    } catch {
-      // Ignore a malformed body and fall back to mock.
-    }
-    // Fire-and-forget: events stream over SSE; failures surface as a decision event.
-    runDemoWithServer({ mode, model: undefined, baseUrl: 'http://127.0.0.1:3000' }).catch((error) => {
-      console.error('Live run failed:', error);
+      body += chunk;
     });
-    sendJson(res, { started: true, mode }, 202);
+    req.on('end', () => {
+      if (!done) resolve(body);
+    });
+    req.on('error', (error) => {
+      if (!done) {
+        done = true;
+        reject(error);
+      }
+    });
   });
 }
 
-function triggerStory(req: http.IncomingMessage, res: http.ServerResponse) {
-  let body = '';
-  req.on('data', (chunk) => {
-    body += chunk;
-  });
-  req.on('end', async () => {
-    try {
-      const parsed = body ? JSON.parse(body) : {};
-      const project = await getProject(parsed.projectId);
-      if (!project || !parsed.body) {
-        return sendJson(res, { error: 'projectId and body are required' }, 400);
-      }
-      const story = await addStory({
-        projectId: project.id,
-        source: 'upload',
-        title: parsed.title || String(parsed.body).trim().slice(0, 60),
-        body: parsed.body
-      });
-      sendJson(res, { started: true, storyId: story.id }, 202);
-      // testpilot manages the demo app; connected projects run their own dev server.
-      const appServer = project.id === 'demo' ? await startDemoServer() : undefined;
-      try {
-        await runStoryPipeline(project, story, { mode: 'mock' });
-      } catch (error) {
-        console.error('Story run failed:', error);
-      } finally {
-        if (appServer) {
-          stopProcessTree(appServer.pid);
-        }
-      }
-    } catch (error) {
-      sendJson(res, { error: String(error) }, 500);
-    }
-  });
+/** Shared preamble for the POST handlers: reject foreign origins (403) and
+ *  oversized bodies (413), otherwise return the parsed JSON (or null on bad JSON). */
+async function readMutation(
+  req: http.IncomingMessage,
+  res: http.ServerResponse
+): Promise<Record<string, unknown> | undefined> {
+  if (!originIsLocal(req)) {
+    sendJson(res, { error: 'forbidden' }, 403);
+    return undefined;
+  }
+  let body: string;
+  try {
+    body = await readBody(req);
+  } catch {
+    sendJson(res, { error: 'request body too large' }, 413);
+    return undefined;
+  }
+  try {
+    return body ? (JSON.parse(body) as Record<string, unknown>) : {};
+  } catch {
+    return {}; // malformed JSON → treat as empty; handlers apply their own defaults
+  }
 }
 
-function triggerDocs(req: http.IncomingMessage, res: http.ServerResponse) {
-  let body = '';
-  req.on('data', (chunk) => {
-    body += chunk;
+async function triggerRun(req: http.IncomingMessage, res: http.ServerResponse) {
+  const parsed = await readMutation(req, res);
+  if (!parsed) return;
+  const mode: ModelMode = parsed.mode === 'openai' ? 'openai' : 'mock';
+  // Fire-and-forget: events stream over SSE; failures surface as a decision event.
+  runDemoWithServer({ mode, model: undefined, baseUrl: 'http://127.0.0.1:3000' }).catch((error) => {
+    console.error('Live run failed:', error);
   });
-  req.on('end', async () => {
-    try {
-      const parsed = body ? JSON.parse(body) : {};
-      const project = await getProject(parsed.projectId);
-      if (!project) {
-        return sendJson(res, { error: 'unknown project' }, 400);
-      }
-      const result = await generateDocs(project);
-      sendJson(res, result);
-    } catch (error) {
-      sendJson(res, { error: String(error) }, 500);
+  sendJson(res, { started: true, mode }, 202);
+}
+
+async function triggerStory(req: http.IncomingMessage, res: http.ServerResponse) {
+  const parsed = await readMutation(req, res);
+  if (!parsed) return;
+  try {
+    const project = await getProject(parsed.projectId as string);
+    if (!project || !parsed.body) {
+      return sendJson(res, { error: 'projectId and body are required' }, 400);
     }
-  });
+    const story = await addStory({
+      projectId: project.id,
+      source: 'upload',
+      title: (parsed.title as string) || String(parsed.body).trim().slice(0, 60),
+      body: parsed.body as string
+    });
+    sendJson(res, { started: true, storyId: story.id }, 202);
+    // testpilot manages the demo app; connected projects run their own dev server.
+    const appServer = project.id === 'demo' ? await startDemoServer() : undefined;
+    try {
+      await runStoryPipeline(project, story, { mode: 'mock' });
+    } catch (error) {
+      console.error('Story run failed:', error);
+    } finally {
+      if (appServer) {
+        stopProcessTree(appServer.pid);
+      }
+    }
+  } catch (error) {
+    sendJson(res, { error: String(error) }, 500);
+  }
+}
+
+async function triggerDocs(req: http.IncomingMessage, res: http.ServerResponse) {
+  const parsed = await readMutation(req, res);
+  if (!parsed) return;
+  try {
+    const project = await getProject(parsed.projectId as string);
+    if (!project) {
+      return sendJson(res, { error: 'unknown project' }, 400);
+    }
+    const result = await generateDocs(project);
+    sendJson(res, result);
+  } catch (error) {
+    sendJson(res, { error: String(error) }, 500);
+  }
 }
 
 async function listRuns() {
@@ -232,7 +288,9 @@ async function serveStatic(pathname: string, res: http.ServerResponse) {
   }
   const requested = pathname === '/' ? '/index.html' : pathname;
   const resolved = path.resolve(uiDist, '.' + requested);
-  if (!resolved.startsWith(uiDist)) {
+  // Boundary check with a trailing separator so a sibling dir that merely shares
+  // the prefix (e.g. `ui/dist-evil`) cannot satisfy it.
+  if (resolved !== uiDist && !resolved.startsWith(uiDist + path.sep)) {
     return sendJson(res, { error: 'forbidden' }, 403);
   }
   const exists = await fs
