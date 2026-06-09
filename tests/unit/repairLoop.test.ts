@@ -203,21 +203,27 @@ function fakeClient(proposeRepair: ModelClient['proposeRepair']): ModelClient {
   };
 }
 
-/** A failing RunResult whose stdout + artifacts steer the real heuristic classifier
- *  to the requested category. */
+/** A failing RunResult whose stdout mimics REAL Playwright output (it cites the
+ *  failing locator / assertion the way Playwright does) + artifacts, steering the
+ *  real heuristic classifier to the requested category. */
 function failRun(target: 'UI_COPY_CHANGE' | 'SELECTOR_DRIFT' | 'PRODUCT_REGRESSION'): RunResult {
   const base = { passed: false as const, testPath, runDir: '/tmp/run' };
   const artifacts = (buttons: string[]): ObservationArtifacts => ({
     url: 'u', title: 't', domPath: '', screenshotPath: '/tmp/fail.png', consoleLogs: [], networkErrors: [], buttons, inputs: []
   });
   if (target === 'UI_COPY_CHANGE') {
-    return { ...base, stdout: "expected button 'Sign in'", stderr: '', failureArtifacts: artifacts(['Log in']) };
+    // The driven control's label changed: lookup of 'Sign in' times out, page shows 'Log in'.
+    const stdout = "locator.click: Timeout 30000ms exceeded.\nCall log: waiting for getByRole('button', { name: 'Sign in' })";
+    return { ...base, stdout, stderr: '', failureArtifacts: artifacts(['Log in']) };
   }
   if (target === 'PRODUCT_REGRESSION') {
-    return { ...base, stdout: 'Expected pattern toHaveURL(/dashboard/)', stderr: '', failureArtifacts: artifacts(['Submit']) };
+    // The flow never reaches /dashboard: the URL assertion fails on a healthy page.
+    const stdout = 'Error: expect(page).toHaveURL(expected) failed\nExpected pattern: /dashboard/\nReceived string: http://127.0.0.1:3000/login\nTimeout 5000ms exceeded';
+    return { ...base, stdout, stderr: '', failureArtifacts: artifacts(['Submit']) };
   }
-  // SELECTOR_DRIFT
-  return { ...base, stdout: 'locator strict mode Timeout exceeded', stderr: '', failureArtifacts: artifacts(['Submit']) };
+  // SELECTOR_DRIFT: a non-textual locator fails while the page still renders controls.
+  const stdout = "locator.click: Timeout 30000ms exceeded.\nCall log: waiting for locator('#submit-btn')";
+  return { ...base, stdout, stderr: '', failureArtifacts: artifacts(['Submit']) };
 }
 
 function passRun(): RunResult {

@@ -51,9 +51,15 @@ GitHub/Jira MCP story ingestion; living docs. See `README.md` for the full pictu
   `src/mcp/client.ts` (+ http/sse transport), `src/connectors/{github,jira}.ts`.
 
 ## Roadmap (next, in priority order)
-1. **Phase 1 — generalize diagnosis/repair beyond the curated login demo.** The
-   classifier (`classifyFailure.ts`) keys off Playwright stderr strings; lean on
-   structured trace parsing + the vision path so it holds up on real apps.
+1. **Phase 1 — generalize diagnosis (DONE) → next, generalize REPAIR.** The
+   classifier now derives app-agnostic structured signals (`src/diagnosis/failureSignals.ts`):
+   it parses *which assertion failed* and *which control the test reached for* from
+   the Playwright error (stripping the echoed source so a later `toHaveURL` line
+   can't masquerade as the failure), and reads the re-observed page — no longer
+   keyed on `intent.submitText`. A failed outcome assertion is always a refused
+   regression; only a control-lookup drift is repairable. Remaining: the REPAIR
+   proposer (mock `proposeRepair`) is still login-shaped — generalize it to rewrite
+   any drifted locator, not just the `Sign in`→role-regex swap.
 2. **Phase 2 — close the connected-repo loop.** Repairs auto-apply only inside
    `tests/generated/`; generalize safe-apply into an external repo behind the existing
    PR-bundle gate (`src/pr/createRepairPr.ts`).

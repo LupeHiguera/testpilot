@@ -1,6 +1,18 @@
 import fs from 'node:fs/promises';
 import { Diagnosis, RunResult, TestIntent } from '../core/types.js';
+import { deriveFailureSignals } from './failureSignals.js';
 
+/**
+ * Classify a failed run into a {@link FailureCategory}. The decision is driven by
+ * the app-agnostic signals in {@link deriveFailureSignals} — the assertion that
+ * failed and the controls the test actually reached for — rather than login-demo
+ * string matching, so it generalises to any Playwright flow.
+ *
+ * It only ever loosens toward refusal: a category is repairable
+ * (SELECTOR_DRIFT / UI_COPY_CHANGE) only on a strong, specific drift signal; a
+ * failed URL/outcome assertion is always treated as the product not reaching its
+ * end state (refused), and anything ambiguous falls through to UNKNOWN (refused).
+ */
 export async function classifyFailure(runResult: RunResult, intent: TestIntent): Promise<Diagnosis> {
   if (runResult.passed) {
     return {
@@ -14,73 +26,90 @@ export async function classifyFailure(runResult: RunResult, intent: TestIntent):
   const output = `${runResult.stdout}\n${runResult.stderr}\n${runResult.error ?? ''}`;
   const artifacts = runResult.failureArtifacts;
   const dom = artifacts?.domPath ? await fs.readFile(artifacts.domPath, 'utf8').catch(() => '') : '';
+  const signals = deriveFailureSignals(output, dom, artifacts, intent);
 
-  if (/ERR_CONNECTION|ECONNREFUSED|net::ERR/i.test(output) || (/timeout/i.test(output) && !dom && !artifacts?.buttons.length)) {
+  // 1. The app never came up / rendered nothing to interact with.
+  if (signals.connectionError || (!signals.pageHealthy && signals.timeoutOnly)) {
     return {
       category: 'APP_UNAVAILABLE',
       confidence: 0.9,
-      reason: 'The app could not be reached reliably.',
+      reason: signals.connectionError
+        ? 'The app could not be reached (connection error).'
+        : 'The page rendered no interactive content before timing out.',
       repairable: false
     };
   }
 
-  if (artifacts?.networkErrors.length) {
+  // 2. A network / API failure underneath the UI.
+  if (signals.hasNetworkErrors || signals.networkConsoleError) {
+    const detail = artifacts?.networkErrors.length ? `: ${artifacts.networkErrors.slice(0, 3).join('; ')}` : '';
     return {
       category: 'NETWORK_OR_API_FAILURE',
       confidence: 0.85,
-      reason: `Network failures were observed: ${artifacts.networkErrors.join('; ')}`,
+      reason: `Network or API failures were observed${detail}.`,
       repairable: false
     };
   }
 
-  // UI copy change: the test looked for the submit control by its (old) label, that
-  // exact label is no longer on the page, but the page DOES still expose a button —
-  // i.e. the control was relabelled, not removed. Keyed off the parsed intent so this
-  // works for any flow, not just the login demo's "Sign in" → "Log in".
-  const submitText = intent.submitText?.trim();
-  const lookedForSubmit = Boolean(submitText) && output.toLowerCase().includes(submitText!.toLowerCase());
-  const pageHasSubmit = artifacts?.buttons.some((button) => button === submitText) ?? false;
-  const pageHasAnotherButton = (artifacts?.buttons.length ?? 0) > 0 && !pageHasSubmit;
-  if (lookedForSubmit && pageHasAnotherButton) {
+  // 3. Safe drift: a control the test DROVE was relabelled (the label changed, the
+  //    flow did not). Only reachable on a control-lookup failure, never on a
+  //    failed outcome assertion.
+  if (signals.relabelledControl) {
+    const lookedFor = signals.lookedForTexts[0];
     return {
       category: 'UI_COPY_CHANGE',
       confidence: 0.9,
-      reason: `The test looked for the "${submitText}" control, but the page now exposes a differently-labelled equivalent button.`,
+      reason: `The test drove a "${lookedFor}" control that is no longer on the page, but the page exposes an equivalent control — the label changed, not the flow.`,
       repairable: true
     };
   }
 
-  if (/toHaveURL|Expected pattern|expect\(page\)/i.test(output) && artifacts?.buttons.length) {
+  // 4. The flow did NOT reach its expected outcome on an otherwise healthy page —
+  //    the product behaviour is broken (or test data / auth is wrong). Refuse so
+  //    the test is never weakened to paper over a real regression.
+  if (signals.outcomeAssertionFailed && signals.pageHealthy) {
+    if (signals.authFailure) {
+      return {
+        category: 'AUTH_OR_TEST_DATA_FAILURE',
+        confidence: 0.75,
+        reason: 'The expected outcome was not reached and the failure points to authentication or test data, not safe UI drift.',
+        repairable: false
+      };
+    }
     return {
       category: 'PRODUCT_REGRESSION',
       confidence: 0.82,
-      reason: `The test did not reach ${intent.expectedPath}, so the expected business outcome is not currently working.`,
+      reason: `The flow did not reach its expected outcome (${intent.expectedPath || 'the asserted end state'}); the product behaviour appears broken, so the test was not weakened.`,
       repairable: false
     };
   }
 
-  if (/locator|strict mode|Timeout/i.test(output) && (dom.includes('button') || artifacts?.buttons.length)) {
+  // 5. A control lookup failed while the page still renders its controls — the
+  //    selector drifted rather than the product breaking.
+  if (signals.selectorDrift) {
     return {
       category: 'SELECTOR_DRIFT',
-      confidence: 0.75,
-      reason: 'The failure appears locator-related while the page still contains interactive controls.',
+      confidence: 0.72,
+      reason: 'A locator failed while the page still renders interactive controls — the selector drifted rather than the product breaking.',
       repairable: true
     };
   }
 
-  if (/password|credential|auth/i.test(output)) {
+  // 6. Auth / test-data failure without a clear outcome assertion.
+  if (signals.authFailure) {
     return {
       category: 'AUTH_OR_TEST_DATA_FAILURE',
       confidence: 0.7,
-      reason: 'The failure mentions credentials or authentication.',
+      reason: 'The failure points to authentication, credentials, or test data.',
       repairable: false
     };
   }
 
+  // 7. Not enough evidence to repair safely.
   return {
     category: 'UNKNOWN',
     confidence: 0.5,
-    reason: 'There is not enough evidence to repair safely.',
+    reason: 'There is not enough evidence to attribute this failure to safe drift, so no repair is proposed.',
     repairable: false
   };
 }
