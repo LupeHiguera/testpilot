@@ -73,7 +73,7 @@ export function App() {
   // A refused control action (e.g. the server's 409 while a run holds the run
   // lock), surfaced as a transient rim toast instead of a silent no-op.
   const [notice, setNotice] = useState<string>();
-  const noticeTimer = useRef<number>();
+  const noticeTimer = useRef<number | undefined>(undefined);
   const showNotice = useCallback((message: string) => {
     setNotice(message);
     window.clearTimeout(noticeTimer.current);
