@@ -112,8 +112,18 @@ GitHub/Jira MCP story ingestion; living docs. See `README.md` for the full pictu
    real GitHub remote (the no-remote bundle fallback is tested); the dashboard
    story form has no open-PR control (bundle-only there); a connected repo must
    have `@playwright/test` installed for `runnable: true`.
-3. **Phase 3 — connectors:** live-verify Jira (code-complete), harden GitHub for
-   private repos / pagination.
+3. **Phase 3 — connectors (HARDENED, 2026-06-10).** `callToolText` throws on
+   tool-level MCP errors (a private repo / bad token reads as what it is, not a
+   JSON.parse crash or empty list); GitHub paginates (`page`/`per_page` default,
+   param names configurable — the reference and official servers disagree) up to
+   a `maxIssues` cap; Jira flattens v3 ADF descriptions (`adfToText`) and pages
+   the REST search envelope via `startAt`. Both connectors are exercised
+   end-to-end over a REAL stdio MCP connection in
+   `tests/integration/connectors.test.ts` (fixture server in `tests/fixtures/`).
+   REMAINING: a genuinely live Jira verification needs a real Atlassian MCP
+   endpoint + token (user-supplied) — run `spec pull-jira` against it; `spec pull`
+   builds its GitHub config from CLI flags only (does not yet read the project's
+   stored github source config).
 4. **Phase 4 — productionize the dashboard:** perf numbers as a CI job-summary; scope
    the perf DOM count to `.canyon-main` so local run-history can't inflate it; auth
    only if it ever leaves localhost.
