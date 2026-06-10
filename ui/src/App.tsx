@@ -70,6 +70,16 @@ export function App() {
   // after the confirm animation window so the slate flashes sunlit once on
   // submit (a quick commit acknowledgement). Reduced-motion gated in CSS.
   const [justSent, setJustSent] = useState(false);
+  // A refused control action (e.g. the server's 409 while a run holds the run
+  // lock), surfaced as a transient rim toast instead of a silent no-op.
+  const [notice, setNotice] = useState<string>();
+  const noticeTimer = useRef<number>();
+  const showNotice = useCallback((message: string) => {
+    setNotice(message);
+    window.clearTimeout(noticeTimer.current);
+    noticeTimer.current = window.setTimeout(() => setNotice(undefined), 5_000);
+  }, []);
+  useEffect(() => () => window.clearTimeout(noticeTimer.current), []);
 
   const refreshRuns = useCallback(() => {
     listRuns()
@@ -115,7 +125,11 @@ export function App() {
   const onRun = async () => {
     setSelected(null);
     setRunning(true);
-    await triggerRun('mock');
+    const result = await triggerRun('mock');
+    if (!result.started) {
+      setRunning(false);
+      showNotice(result.error ?? 'could not start the run');
+    }
   };
 
   const onUploadStory = async (event: FormEvent) => {
@@ -125,9 +139,15 @@ export function App() {
     }
     setSelected(null);
     setRunning(true);
+    const result = await uploadStory({ projectId, title: storyTitle.trim() || undefined, body: storyBody });
+    if (!result.started) {
+      // Keep the typed story so a refusal (run in flight, server down) loses nothing.
+      setRunning(false);
+      showNotice(result.error ?? 'could not send the story');
+      return;
+    }
     setJustSent(true);
     window.setTimeout(() => setJustSent(false), 700);
-    await uploadStory({ projectId, title: storyTitle.trim() || undefined, body: storyBody });
     setStoryTitle('');
     setStoryBody('');
   };
@@ -176,6 +196,20 @@ export function App() {
           </button>
         </div>
       </header>
+
+      {/* Always-mounted polite live region so a refusal is announced the moment
+          it lands; visually a carved rim chip under the run controls. */}
+      <div className="rim-toast-region" role="status">
+        {notice && (
+          <div className="rim-toast">
+            <span className="rim-toast-mark" aria-hidden>!</span>
+            <span className="rim-toast-text">{notice}</span>
+            <button className="rim-toast-dismiss" aria-label="Dismiss notice" onClick={() => setNotice(undefined)}>
+              ×
+            </button>
+          </div>
+        )}
+      </div>
 
       <div className="layout">
         <aside className="rail">

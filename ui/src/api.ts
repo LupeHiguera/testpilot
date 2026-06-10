@@ -16,12 +16,36 @@ export async function getRun(runId: string): Promise<{ runId: string; report?: u
   return response.json();
 }
 
-export async function triggerRun(mode: 'mock' | 'openai' = 'mock'): Promise<void> {
-  await fetch('/api/run', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mode })
-  });
+/** Outcome of asking the server to start work. `error` carries the server's
+ *  refusal (e.g. "a run is already in progress" from the 409 run lock) so the
+ *  UI can surface it instead of silently doing nothing. */
+export interface TriggerResult {
+  started: boolean;
+  error?: string;
+}
+
+async function toTriggerResult(request: Promise<Response>): Promise<TriggerResult> {
+  let response: Response;
+  try {
+    response = await request;
+  } catch {
+    return { started: false, error: 'the live server is unreachable' };
+  }
+  if (response.ok) {
+    return { started: true };
+  }
+  const body = (await response.json().catch(() => undefined)) as { error?: string } | undefined;
+  return { started: false, error: body?.error ?? `request failed (${response.status})` };
+}
+
+export async function triggerRun(mode: 'mock' | 'openai' = 'mock'): Promise<TriggerResult> {
+  return toTriggerResult(
+    fetch('/api/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode })
+    })
+  );
 }
 
 export async function listProjects(): Promise<Project[]> {
@@ -40,12 +64,14 @@ export async function listStories(projectId: string): Promise<Story[]> {
   return response.json();
 }
 
-export async function uploadStory(input: { projectId: string; title?: string; body: string }): Promise<void> {
-  await fetch('/api/stories', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input)
-  });
+export async function uploadStory(input: { projectId: string; title?: string; body: string }): Promise<TriggerResult> {
+  return toTriggerResult(
+    fetch('/api/stories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input)
+    })
+  );
 }
 
 export async function getDocs(projectId: string): Promise<DocsModel> {
