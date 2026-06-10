@@ -49,6 +49,19 @@ describe('classifyFailure', () => {
     expect(result.repairable).toBe(true);
   });
 
+  it('classifies a relabelled LINK as UI_COPY_CHANGE (links count as present controls)', async () => {
+    // The test drove a "View cart" link; the page now exposes a "Your basket"
+    // link (and no buttons at all) — link capture must make this repairable.
+    const result = await classifyFailure(
+      makeRunResult("locator.click: Timeout 30000ms exceeded.\nCall log: waiting for getByRole('link', { name: 'View cart' })", [], {
+        links: ['Your basket']
+      }),
+      { ...intent, name: 'cart', expectedPath: '/cart', expectedText: 'Your basket' }
+    );
+    expect(result.category).toBe('UI_COPY_CHANGE');
+    expect(result.repairable).toBe(true);
+  });
+
   it('classifies a failed CSS locator on a healthy page as SELECTOR_DRIFT', async () => {
     const result = await classifyFailure(
       makeRunResult("locator.click: Timeout 30000ms exceeded.\nCall log: waiting for locator('#submit-btn')", ['Sign in']),

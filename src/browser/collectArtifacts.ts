@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from '@playwright/test';
 import { ObservationArtifacts } from '../core/types.js';
+import { captureControls } from './captureControls.js';
 
 export async function collectFailureArtifacts(baseUrl: string, route: string, runDir: string): Promise<ObservationArtifacts> {
   await fs.mkdir(runDir, { recursive: true });
@@ -20,15 +21,7 @@ export async function collectFailureArtifacts(baseUrl: string, route: string, ru
     await fs.writeFile(domPath, await page.content(), 'utf8');
     await page.screenshot({ path: screenshotPath, fullPage: true });
 
-    const buttons = await page.locator('button').evaluateAll((buttons) => buttons.map((button) => button.textContent?.trim() ?? '').filter(Boolean));
-    const inputs = await page.locator('input').evaluateAll((inputs) =>
-      inputs.map((input) => ({
-        name: input.getAttribute('name') ?? '',
-        type: input.getAttribute('type') ?? '',
-        placeholder: input.getAttribute('placeholder') ?? '',
-        label: input.closest('label')?.textContent?.trim() ?? ''
-      }))
-    );
+    const { buttons, links, inputs } = await captureControls(page);
 
     return {
       url: page.url(),
@@ -38,6 +31,7 @@ export async function collectFailureArtifacts(baseUrl: string, route: string, ru
       consoleLogs,
       networkErrors,
       buttons,
+      links,
       inputs
     };
   } finally {

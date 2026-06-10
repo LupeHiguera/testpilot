@@ -30,7 +30,12 @@ export interface ObservationArtifacts {
   screenshotPath: string;
   consoleLogs: string[];
   networkErrors: string[];
+  /** Accessible names of button-role controls (<button>, [role=button],
+   *  submit/button inputs — everything getByRole('button') matches). */
   buttons: string[];
+  /** Accessible names of links. Optional: artifacts recorded before links were
+   *  captured (older run-result.json files on disk) lack the field. */
+  links?: string[];
   inputs: Array<{
     name: string;
     type: string;

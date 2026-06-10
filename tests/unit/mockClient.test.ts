@@ -7,8 +7,8 @@ const client = new MockModelClient();
 const diagnosis: Diagnosis = { category: 'UI_COPY_CHANGE', confidence: 0.9, reason: 'copy changed', repairable: true };
 const runResult: RunResult = { passed: false, testPath: 'flow.spec.ts', runDir: 'runs/unit', stdout: '', stderr: '' };
 
-function observation(buttons: string[]): ObservationArtifacts {
-  return { url: 'u', title: 't', domPath: '', screenshotPath: '', consoleLogs: [], networkErrors: [], buttons, inputs: [] };
+function observation(buttons: string[], links: string[] = []): ObservationArtifacts {
+  return { url: 'u', title: 't', domPath: '', screenshotPath: '', consoleLogs: [], networkErrors: [], buttons, links, inputs: [] };
 }
 
 /** A generated test that drives `submitLabel` and asserts a route + outcome. */
@@ -122,6 +122,41 @@ test('flow', async ({ page }) => {
     // drifted "Sign in" is widened, and onto the unreferenced "Log in".
     expect(proposal.proposedContent).toContain("{ name: 'Continue' }");
     expect(proposal.proposedContent).toContain('/^(Sign in|Log in)$/');
+  });
+
+  it('repairs a relabelled LINK the same way (View cart -> Your basket)', async () => {
+    const content = `import { expect, test } from '@playwright/test';
+test('flow', async ({ page }) => {
+  await page.goto('/x');
+  await page.getByRole('link', { name: 'View cart' }).click();
+  await expect(page).toHaveURL(/\\/done/);
+  await expect(page.getByText('Done')).toBeVisible();
+});`;
+    const proposal = await client.proposeRepair({
+      testPath: 'x.spec.ts',
+      testContent: content,
+      diagnosis,
+      runResult,
+      observation: observation([], ['Your basket'])
+    });
+
+    expect(proposal.safeToApply).toBe(true);
+    expect(proposal.proposedContent).toContain("getByRole('link', { name: /^(View cart|Your basket)$/ })");
+    expect(proposal.reason).toContain('link');
+  });
+
+  it('never maps a vanished button onto a link (roles stay separate)', async () => {
+    const proposal = await client.proposeRepair({
+      testPath: 'x.spec.ts',
+      testContent: testFor('Sign in'), // drives a BUTTON named "Sign in"
+      diagnosis,
+      runResult,
+      // No buttons on the page at all — only a similarly-named link.
+      observation: observation([], ['Sign in here'])
+    });
+
+    expect(proposal.safeToApply).toBe(false);
+    expect(proposal.proposedContent).toBe(testFor('Sign in'));
   });
 
   it('proposes no repair when no current button maps to the driven control', async () => {

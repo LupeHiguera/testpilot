@@ -42,17 +42,20 @@ test('${intent.name}', async ({ page }) => {
     diagnosis: Diagnosis;
     runResult: RunResult;
     // The fresh page observation the repair loop takes before proposing; the mock
-    // grounds its repair in the CURRENT buttons so the fix is real, not hard-coded.
+    // grounds its repair in the CURRENT controls so the fix is real, not hard-coded.
     observation?: ObservationArtifacts;
   }): Promise<RepairProposal> {
-    // Prefer the fresh observation's buttons; fall back to the failure artifacts.
-    const presentButtons = input.observation?.buttons ?? input.runResult.failureArtifacts?.buttons ?? [];
-    const repair = widenSubmitLocator(input.testContent, presentButtons);
+    // Prefer the fresh observation's controls; fall back to the failure artifacts.
+    const present = input.observation ?? input.runResult.failureArtifacts;
+    const repair = widenRelabeledLocator(input.testContent, {
+      button: present?.buttons ?? [],
+      link: present?.links ?? []
+    });
     return {
       category: input.diagnosis.category,
       reason: repair
-        ? `Widen the brittle "${repair.oldLabel}" submit selector to a role locator that matches both the old label and the page's current "${repair.newLabel}" button, preserving the submit action and every assertion.`
-        : 'No safe generated-test repair was found (the driven control could not be matched to a current button).',
+        ? `Widen the brittle "${repair.oldLabel}" ${repair.role} selector to a role locator that matches both the old label and the page's current "${repair.newLabel}" ${repair.role}, preserving the action and every assertion.`
+        : 'No safe generated-test repair was found (the driven control could not be matched to a current control).',
       originalPath: input.testPath,
       proposedContent: repair ? repair.content : input.testContent,
       diff: repair ? createPatch(input.testPath, input.testContent, repair.content) : '',
@@ -73,44 +76,47 @@ function pathRegexSource(routePath: string): string {
 }
 
 /**
- * Generalised safe repair for a relabelled submit control. Finds a
- * `getByRole('button', { name: 'OLD' })` the test DRIVES whose label is no longer
- * among the page's current buttons, and widens it to a role locator matching BOTH
- * the old label and the equivalent current button — so a copy change is repaired
- * on ANY flow, not just the login demo's `Sign in` -> `Log in`. The widened locator
- * still preserves the original label (in case it returns) and touches nothing else,
- * so validatePatch's assertion/route guards still hold. Returns null when no driven
- * control maps to a current button (no fabricated repair).
+ * Generalised safe repair for a relabelled control. Finds a
+ * `getByRole('button'|'link', { name: 'OLD' })` the test DRIVES whose label is no
+ * longer among the page's current controls OF THAT ROLE, and widens it to a role
+ * locator matching BOTH the old label and the equivalent current control — so a
+ * copy change is repaired on ANY flow (buttons and links alike), not just the
+ * login demo's `Sign in` -> `Log in`. The widened locator still preserves the
+ * original label (in case it returns) and touches nothing else, so validatePatch's
+ * assertion/route guards still hold. Returns null when no driven control maps to a
+ * current one (no fabricated repair).
  */
-function widenSubmitLocator(
+function widenRelabeledLocator(
   testContent: string,
-  presentButtons: string[]
-): { content: string; oldLabel: string; newLabel: string } | null {
-  const present = presentButtons.map((button) => button.trim()).filter(Boolean);
-  const presentLower = present.map((button) => button.toLowerCase());
-  const locator = /getByRole\((['"])button\1,\s*\{\s*name:\s*(['"])([^'"]+)\2\s*\}\)/g;
+  presentByRole: { button: string[]; link: string[] }
+): { content: string; oldLabel: string; newLabel: string; role: 'button' | 'link' } | null {
+  const locator = /getByRole\((['"])(button|link)\1,\s*\{\s*name:\s*(['"])([^'"]+)\3\s*\}\)/g;
 
   for (let match = locator.exec(testContent); match; match = locator.exec(testContent)) {
-    const oldLabel = match[3];
-    if (presentLower.includes(oldLabel.toLowerCase())) {
+    const role = match[2] as 'button' | 'link';
+    const oldLabel = match[4];
+    // Candidates come from the SAME role: a vanished button is never mapped onto
+    // a link (or vice versa) — that would change what the test drives.
+    const present = presentByRole[role].map((label) => label.trim()).filter(Boolean);
+    if (present.some((label) => label.toLowerCase() === oldLabel.toLowerCase())) {
       continue; // the driven control is still on the page → not a relabel
     }
-    // Candidates are current buttons the test does not already reference — a
+    // Candidates are current controls the test does not already reference — a
     // label that appears in the test is some other control it drives, not the
     // relabelled one. Among those, prefer the label that reads most like the old
-    // one, so a multi-button page maps "Sign in" → "Log in", not "Forgot password".
+    // one, so a multi-control page maps "Sign in" → "Log in", not "Forgot password".
     const candidates = present.filter(
-      (button) =>
-        button.toLowerCase() !== oldLabel.toLowerCase() && !testContent.toLowerCase().includes(button.toLowerCase())
+      (label) =>
+        label.toLowerCase() !== oldLabel.toLowerCase() && !testContent.toLowerCase().includes(label.toLowerCase())
     );
     const newLabel = pickClosestLabel(oldLabel, candidates);
     if (!newLabel) {
-      continue; // no current button to map the drifted label onto
+      continue; // no current control to map the drifted label onto
     }
     const alternatives = [oldLabel, newLabel].map(escapeForRegex).join('|');
-    const replacement = `getByRole('button', { name: /^(${alternatives})$/ })`;
+    const replacement = `getByRole('${role}', { name: /^(${alternatives})$/ })`;
     const content = testContent.slice(0, match.index) + replacement + testContent.slice(match.index + match[0].length);
-    return { content, oldLabel, newLabel };
+    return { content, oldLabel, newLabel, role };
   }
   return null;
 }

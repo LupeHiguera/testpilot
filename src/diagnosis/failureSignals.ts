@@ -107,6 +107,7 @@ function detectMatcher(clean: string): FailureSignals['failedMatcher'] {
 function presentControlTexts(artifacts: ObservationArtifacts | undefined): string[] {
   return [
     ...(artifacts?.buttons ?? []),
+    ...(artifacts?.links ?? []),
     ...(artifacts?.inputs ?? []).flatMap((input) => [input.label, input.placeholder, input.name])
   ]
     .map((text) => text.toLowerCase().trim())
@@ -130,7 +131,8 @@ export function deriveFailureSignals(
   const failedMatcher = detectMatcher(clean);
   const lookedForTexts = collectLookedForTexts(clean);
 
-  const interactiveCount = (artifacts?.buttons.length ?? 0) + (artifacts?.inputs.length ?? 0);
+  const interactiveCount =
+    (artifacts?.buttons.length ?? 0) + (artifacts?.links?.length ?? 0) + (artifacts?.inputs.length ?? 0);
   const pageHealthy = interactiveCount > 0 || /<(?:button|input|select|form|a\s)/i.test(dom);
 
   const assertedExpectedText =
