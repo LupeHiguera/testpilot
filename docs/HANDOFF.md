@@ -99,9 +99,19 @@ GitHub/Jira MCP story ingestion; living docs. See `README.md` for the full pictu
    repair is fabricated when nothing maps. Known limit: the relabel repair sources
    new labels from `observation.buttons`, so non-button controls (links) need the
    artifact collector to capture them first.
-2. **Phase 2 — close the connected-repo loop.** Repairs auto-apply only inside
-   `tests/generated/`; generalize safe-apply into an external repo behind the existing
-   PR-bundle gate (`src/pr/createRepairPr.ts`).
+2. **Phase 2 — close the connected-repo loop (CORE DONE, 2026-06-10).** Safe repairs
+   flow into a connected project's own repo: `validatePatch` scopes writes to the
+   project's tests dir (`allowedTestsRoot` — still strict tests-dir containment,
+   never a repo root); external tests run INSIDE the connected repo with its own
+   Playwright toolchain (`runPlaywrightTest` `repoRoot` — testpilot's runner +
+   the repo's `@playwright/test` would double-load and crash); a green repair is
+   bundled as a PR in the run dir always and opened as a real branch + GitHub PR
+   with `spec add --open-pr` (`createRepairPr` `repoRoot`, original branch
+   restored afterwards). Verified live against a registered external repo + the
+   copy-change demo app. REMAINING: live-verify the `--open-pr` path against a
+   real GitHub remote (the no-remote bundle fallback is tested); the dashboard
+   story form has no open-PR control (bundle-only there); a connected repo must
+   have `@playwright/test` installed for `runnable: true`.
 3. **Phase 3 — connectors:** live-verify Jira (code-complete), harden GitHub for
    private repos / pagination.
 4. **Phase 4 — productionize the dashboard:** perf numbers as a CI job-summary; scope

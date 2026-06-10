@@ -37,7 +37,10 @@ describe('runPlaywrightTest with an external (connected-repo) test path', () => 
       route: '/',
       repoRoot: extRepo
     });
-    expect(result.stdout + result.stderr).toContain('external smoke');
+    // Reporter-independent assertions: the repo's own toolchain found exactly the
+    // one external test and it passed (a "No tests found" failure exits non-zero).
+    // (CI's non-TTY dot reporter never prints test titles, so don't assert those.)
+    expect(result.stdout).toContain('Running 1 test');
     expect(result.passed).toBe(true);
   });
 });
