@@ -4,14 +4,20 @@
  * The dashboard's read-layer states a budget (ui/src/runModel.ts: PERF_BUDGET).
  * This script ENFORCES it against the real built UI so the budget is a gate, not
  * a comment: it boots the live server, loads the dashboard, drives a full mock
- * demo run, then measures the initial load time and the post-run DOM size and
- * fails (non-zero exit) if either exceeds the budget.
+ * demo run, and fails (non-zero exit) on any breach.
+ *
+ * The DOM budgets are scoped to the live canyon pane (`.canyon-pane`) — what a
+ * run actually renders — so the Expeditions history rail (which grows with the
+ * local run archive) cannot inflate the numbers on a dev box or shrink them on a
+ * fresh CI runner. Whole-page totals are reported as information for trend
+ * tracking, not gated.
  *
  * Run: npm run perf:budget   (after `npm run ui:build` so dist/ is fresh)
- * The metrics mirror what tools/grader-mcp run_ui_checks observes, so the gate
- * and the grader watch the same numbers.
+ * In GitHub Actions the results are also appended to the job summary
+ * ($GITHUB_STEP_SUMMARY) as a markdown table.
  */
 import { spawn } from 'node:child_process';
+import fs from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 import { stopProcessTree } from '../src/pipeline/demoServer.js';
 import { PERF_BUDGET } from '../ui/src/runModel.js';
@@ -23,6 +29,14 @@ const URL = `http://127.0.0.1:${PORT}`;
 // regressions (a 2x blow-up) without flapping on runner jitter.
 const LOAD_TOLERANCE = Number(process.env.PERF_LOAD_TOLERANCE ?? 2.5);
 const maxLoadMs = Math.round(PERF_BUDGET.maxLoadMs * LOAD_TOLERANCE);
+
+interface Metric {
+  label: string;
+  value: number;
+  unit: string;
+  /** Budget limit; undefined = informational only (reported, never gated). */
+  limit?: number;
+}
 
 async function waitForServer(timeoutMs = 20_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
@@ -44,42 +58,83 @@ const server = spawn(
   { stdio: 'inherit', detached: process.platform !== 'win32' }
 );
 
+function metricOk(metric: Metric): boolean {
+  return metric.limit === undefined || metric.value <= metric.limit;
+}
+
+function consoleLine(metric: Metric): string {
+  const verdict = metric.limit === undefined ? 'INFO' : metricOk(metric) ? 'PASS' : 'FAIL';
+  const budget = metric.limit === undefined ? '' : ` (budget ${metric.limit}${metric.unit})`;
+  return `  ${verdict}  ${metric.label}: ${metric.value}${metric.unit}${budget}`;
+}
+
+/** Append a markdown table to the GitHub Actions job summary, when in CI. */
+async function writeJobSummary(metrics: Metric[]): Promise<void> {
+  const summaryPath = process.env.GITHUB_STEP_SUMMARY;
+  if (!summaryPath) {
+    return;
+  }
+  const rows = metrics.map((metric) => {
+    const status = metric.limit === undefined ? 'ℹ️ info' : metricOk(metric) ? '✅ pass' : '❌ fail';
+    const budget = metric.limit === undefined ? '—' : `≤ ${metric.limit}${metric.unit}`;
+    return `| ${metric.label} | ${metric.value}${metric.unit} | ${budget} | ${status} |`;
+  });
+  const table = [
+    '### Perf budget (dashboard)',
+    '',
+    '| metric | value | budget | status |',
+    '| --- | ---: | ---: | --- |',
+    ...rows,
+    ''
+  ].join('\n');
+  await fs.appendFile(summaryPath, table, 'utf8').catch((error) => {
+    console.error('could not write job summary:', error);
+  });
+}
+
 let failed = false;
 try {
   await waitForServer();
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const count = (selector: string) =>
+      page.evaluate((s: string) => document.querySelectorAll(s).length, selector);
 
-    // 1. Initial load time — wall-clock around the navigation (same metric the
-    //    grader reports), on the fresh idle dashboard.
+    // 1. Initial load time — wall-clock around the navigation, on the fresh idle
+    //    dashboard — plus the idle canyon pane (near-empty by design).
     const start = Date.now();
     await page.goto(URL, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.canyon-pane', { timeout: 15_000 });
     const loadMs = Date.now() - start;
-    const idleDomNodes = await page.evaluate(() => document.querySelectorAll('*').length);
+    const idleCanyonNodes = await count('.canyon-pane *');
+    const idlePageNodes = await count('*');
 
-    // 2. Drive a full mock demo run, then measure the DOM size of the populated
-    //    canyon — the worst case (every strata layer + the evidence ledger).
+    // 2. Drive a full mock demo run, then measure the populated canyon — the
+    //    worst case (every strata layer + the evidence ledger).
     await page.getByRole('button', { name: /run demo/i }).click();
     await page.waitForSelector('.strata.s-decision', { timeout: 150_000 });
     await page.waitForTimeout(600);
-    const runDomNodes = await page.evaluate(() => document.querySelectorAll('*').length);
+    const runCanyonNodes = await count('.canyon-pane *');
+    const runPageNodes = await count('*');
 
-    const loadOk = loadMs <= maxLoadMs;
-    const idleOk = idleDomNodes <= PERF_BUDGET.maxIdleDomNodes;
-    const runOk = runDomNodes <= PERF_BUDGET.maxRunDomNodes;
-    failed = !(loadOk && idleOk && runOk);
+    const metrics: Metric[] = [
+      { label: 'initial load', value: loadMs, unit: 'ms', limit: maxLoadMs },
+      { label: 'canyon DOM (idle)', value: idleCanyonNodes, unit: '', limit: PERF_BUDGET.maxIdleCanyonNodes },
+      { label: 'canyon DOM (full run)', value: runCanyonNodes, unit: '', limit: PERF_BUDGET.maxRunCanyonNodes },
+      { label: 'whole page DOM (idle)', value: idlePageNodes, unit: '' },
+      { label: 'whole page DOM (full run)', value: runPageNodes, unit: '' }
+    ];
+    failed = !metrics.every(metricOk);
 
-    const line = (ok: boolean, label: string, value: number, limit: number, unit: string) =>
-      `  ${ok ? 'PASS' : 'FAIL'}  ${label}: ${value}${unit} (budget ${limit}${unit})`;
     console.log('PERF BUDGET');
-    console.log(line(loadOk, 'initial load', loadMs, maxLoadMs, 'ms'));
-    console.log(line(idleOk, 'DOM nodes (idle)', idleDomNodes, PERF_BUDGET.maxIdleDomNodes, ''));
-    console.log(line(runOk, 'DOM nodes (full run)', runDomNodes, PERF_BUDGET.maxRunDomNodes, ''));
+    for (const metric of metrics) {
+      console.log(consoleLine(metric));
+    }
     if (failed) {
       console.error('\nPerf budget exceeded — see FAIL lines above.');
     }
+    await writeJobSummary(metrics);
   } finally {
     await browser.close();
   }

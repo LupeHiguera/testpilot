@@ -85,10 +85,10 @@ describe('fmtElapsed', () => {
 });
 
 describe('PERF_BUDGET', () => {
-  it('states positive load + DOM ceilings the dashboard holds to (enforced in CI)', () => {
+  it('states positive load + canyon-DOM ceilings the dashboard holds to (enforced in CI)', () => {
     expect(PERF_BUDGET.maxLoadMs).toBeGreaterThan(0);
-    expect(PERF_BUDGET.maxIdleDomNodes).toBeGreaterThan(0);
+    expect(PERF_BUDGET.maxIdleCanyonNodes).toBeGreaterThan(0);
     // A full run is heavier than idle, so its ceiling must be the looser of the two.
-    expect(PERF_BUDGET.maxRunDomNodes).toBeGreaterThan(PERF_BUDGET.maxIdleDomNodes);
+    expect(PERF_BUDGET.maxRunCanyonNodes).toBeGreaterThan(PERF_BUDGET.maxIdleCanyonNodes);
   });
 });

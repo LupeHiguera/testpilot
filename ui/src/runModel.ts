@@ -7,18 +7,23 @@ import type { PipelineEvent, Status } from './types';
  * (tests/unit/runModel.test.ts) and the view components stay thin renderers over
  * their results.
  *
- * PERF BUDGET (stated AND enforced in CI by tools/perf-budget.ts; the same metrics
- * tools/grader-mcp run_ui_checks observes): the dashboard's initial paint loads in
- * under ~1.2s and the idle dashboard stays under ~4500 DOM nodes; even after a FULL
- * demo run renders every strata layer plus the evidence ledger, the pixel-art canyon
- * stays bounded under ~8000 nodes. Keep these derivations O(events) and keep heavy
- * per-row mounts (evidence plates + diffs) lazy/gated so DOM growth stays roughly
- * linear in the run length rather than ballooning.
+ * PERF BUDGET (stated AND enforced in CI by tools/perf-budget.ts): the dashboard's
+ * initial paint loads in under ~1.2s, and the DOM budgets are scoped to the LIVE
+ * CANYON PANE (`.canyon-pane` — the strata staircase, atmosphere, and evidence
+ * ledger): near-empty idle, and bounded under ~4500 nodes even after a FULL demo
+ * run renders every layer. Scoping matters: the Expeditions history rail grows
+ * with the local run archive, so whole-page counts differ between a dev box and
+ * a fresh CI runner — those totals are reported as information, not gated. Keep
+ * these derivations O(events) and keep heavy per-row mounts (evidence plates +
+ * diffs) lazy/gated so canyon DOM growth stays roughly linear in run length.
  */
 export const PERF_BUDGET = {
   maxLoadMs: 1200,
-  maxIdleDomNodes: 4500,
-  maxRunDomNodes: 8000
+  /** `.canyon-pane *` on the fresh idle dashboard (the empty state is ~30 nodes;
+   *  this catches accidentally eager-mounting the canyon before a run exists). */
+  maxIdleCanyonNodes: 200,
+  /** `.canyon-pane *` after a full demo run (~3000 measured). */
+  maxRunCanyonNodes: 4500
 } as const;
 
 export interface Diagnosis {
