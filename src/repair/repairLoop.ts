@@ -41,6 +41,9 @@ export interface RepairLoopDeps {
   vision?: boolean;
   /** Hard upper bound on repair attempts. Default 2. */
   maxAttempts?: number;
+  /** Where repairs may write (a tests dir): testpilot's `tests/generated/` by
+   *  default, or a connected project's tests dir. Passed to validatePatch. */
+  allowedTestsRoot?: string;
   /** Repo-relative failure screenshot, attached to the terminal repair event so
    *  the dashboard's before/after plates render. */
   beforeScreenshot?: string;
@@ -102,7 +105,7 @@ export async function runRepairLoop(deps: RepairLoopDeps): Promise<RepairLoopRes
     const observation = await observe();
     lastObservation = observation;
     const proposal = await proposePatch(client, { testPath, diagnosis, runResult: currentRun, observation });
-    const validation = validatePatch(proposal, diagnosis, intent);
+    const validation = validatePatch(proposal, diagnosis, intent, { allowedTestsRoot: deps.allowedTestsRoot });
 
     if (!validation.valid) {
       emit('repair', 'info', `Repair refused: ${validation.reason}`, { attempt, maxAttempts });

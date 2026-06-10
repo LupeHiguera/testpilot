@@ -10,15 +10,21 @@ const safeCategories = new Set(['SELECTOR_DRIFT', 'UI_COPY_CHANGE', 'TIMING_OR_F
  * ever LOOSENS toward refusal. The assertions it requires the repair to preserve
  * are derived from the parsed `intent` (the expected route + expected outcome
  * text), so the guard protects any flow — not just the bundled login demo.
+ *
+ * `allowedTestsRoot` scopes WHERE a repair may write: testpilot's own
+ * `tests/generated/` by default, or a connected project's tests dir
+ * (`repoPath/testsDir`). It is always a *tests* directory — never a repo root —
+ * so a repair can only ever touch a generated test, not application code.
  */
 export function validatePatch(
   proposal: RepairProposal,
   diagnosis: Diagnosis,
-  intent: TestIntent
+  intent: TestIntent,
+  options: { allowedTestsRoot?: string } = {}
 ): { valid: boolean; reason: string } {
   const normalizedPath = path.resolve(proposal.originalPath);
-  const generatedRoot = path.resolve(generatedTestsDir);
-  // Require a path strictly inside the generated-tests dir. The trailing separator
+  const generatedRoot = path.resolve(options.allowedTestsRoot ?? generatedTestsDir);
+  // Require a path strictly inside the allowed tests dir. The trailing separator
   // matters: a bare startsWith would also accept a sibling like `tests/generated-x`.
   if (!normalizedPath.startsWith(generatedRoot + path.sep)) {
     return { valid: false, reason: 'Repairs may only edit generated tests.' };

@@ -6,6 +6,7 @@ import { emitStage } from '../events/bus.js';
 import { PipelineEventStatus, PipelineStage } from '../events/types.js';
 import { generatePlaywrightTest } from '../generator/generatePlaywrightTest.js';
 import { createModelClient } from '../generator/modelClient.js';
+import { createRepairPr } from '../pr/createRepairPr.js';
 import { Project } from '../projects/types.js';
 import { runRepairLoop } from '../repair/repairLoop.js';
 import { writeReport } from '../reporting/writeReport.js';
@@ -18,6 +19,9 @@ export interface StoryRunResult {
   runDir: string;
   testPath: string;
   status: StoryStatus;
+  /** Set when a green repair was bundled (and possibly opened) as a PR. */
+  prBundleDir?: string;
+  prUrl?: string;
 }
 
 /**
@@ -28,7 +32,7 @@ export interface StoryRunResult {
 export async function runStoryPipeline(
   project: Project,
   story: Story,
-  opts: { mode: ModelMode; model?: string; vision?: boolean } = { mode: 'mock' }
+  opts: { mode: ModelMode; model?: string; vision?: boolean; openPr?: boolean } = { mode: 'mock' }
 ): Promise<StoryRunResult> {
   const client = createModelClient(opts.mode, opts.model);
   const runDir = createRunDir(`story-${story.id}`);
@@ -61,12 +65,14 @@ export async function runStoryPipeline(
     }
 
     emit('run', 'start', `Running against ${project.name}`);
-    const runResult = await runPlaywrightTest({ testPath, baseUrl: project.baseUrl, route: intent.route });
+    const runResult = await runPlaywrightTest({ testPath, baseUrl: project.baseUrl, route: intent.route, repoRoot: project.repoPath });
     emit('run', runResult.passed ? 'pass' : 'fail', `Test ${runResult.passed ? 'passed' : 'failed'}`, {
       failureScreenshot: rel(runResult.failureArtifacts?.screenshotPath)
     });
 
     let status: StoryStatus = runResult.passed ? 'passing' : 'failing';
+    let prBundleDir: string | undefined;
+    let prUrl: string | undefined;
     if (!runResult.passed) {
       emit('diagnose', 'start', 'Diagnosing the failure');
       const repair = await runRepairLoop({
@@ -75,11 +81,39 @@ export async function runStoryPipeline(
         firstRun: runResult,
         client,
         vision: opts.vision,
+        // Repairs may only write inside THIS project's tests dir — the same
+        // strict containment validatePatch enforces for testpilot's own
+        // tests/generated/, rooted at the connected repo instead.
+        allowedTestsRoot: path.join(project.repoPath, project.testsDir),
         observe: () => observePage(project.baseUrl, intent.route, createRunDir(`story-${story.id}-repair`)),
-        runTest: () => runPlaywrightTest({ testPath, baseUrl: project.baseUrl, route: intent.route }),
-        emit
+        runTest: () => runPlaywrightTest({ testPath, baseUrl: project.baseUrl, route: intent.route, repoRoot: project.repoPath }),
+        emit,
+        beforeScreenshot: rel(runResult.failureArtifacts?.screenshotPath),
+        relArtifact: rel
       });
       status = repair.status;
+      if (repair.status === 'passing' && repair.repairApplied && repair.proposal) {
+        // The repaired test re-ran green: hand it to a human as a PR against the
+        // project's own repo — a bundle always, a real branch+PR only on request.
+        const pr = await createRepairPr({
+          testPath,
+          proposal: repair.proposal,
+          diagnosis: repair.diagnosis,
+          intent,
+          runDir,
+          repoRoot: project.repoPath,
+          beforeScreenshot: runResult.failureArtifacts?.screenshotPath,
+          afterScreenshot: repair.lastObservation?.screenshotPath,
+          openPr: Boolean(opts.openPr)
+        });
+        prBundleDir = pr.bundleDir;
+        prUrl = pr.prUrl;
+        emit('pr', 'info', pr.opened ? `Repair PR opened: ${pr.prUrl}` : 'Repair PR bundle written', {
+          bundleDir: rel(pr.bundleDir),
+          ...(pr.prUrl ? { prUrl: pr.prUrl } : {}),
+          ...(pr.skippedReason ? { skippedReason: pr.skippedReason } : {})
+        });
+      }
       await writeReport({
         runDir,
         intent,
@@ -96,7 +130,7 @@ export async function runStoryPipeline(
 
     await updateStory(project.id, story.id, { status });
     emit('decision', status === 'passing' ? 'pass' : 'info', `Story ${status}`);
-    return { runId, runDir, testPath, status };
+    return { runId, runDir, testPath, status, prBundleDir, prUrl };
   } catch (error) {
     emit('decision', 'fail', `Story run failed: ${String(error)}`);
     throw error;

@@ -58,6 +58,45 @@ test('login', async ({ page }) => {
     expect(result.valid).toBe(false);
   });
 
+  // Connected repos: the boundary can be rooted at the project's own tests dir,
+  // but stays a strict tests-dir containment — never the repo root.
+  describe('allowedTestsRoot (connected repos)', () => {
+    const repoRoot = path.join(path.parse(process.cwd()).root, 'connected-repo');
+    const testsRoot = path.join(repoRoot, 'e2e');
+
+    function proposalAt(originalPath: string): RepairProposal {
+      return { ...makeProposal(loginContent()), originalPath };
+    }
+
+    it('accepts a repair inside the connected tests dir', () => {
+      const result = validatePatch(proposalAt(path.join(testsRoot, 'login.spec.ts')), diagnosis, loginIntent, {
+        allowedTestsRoot: testsRoot
+      });
+      expect(result.valid).toBe(true);
+    });
+
+    it('refuses a path outside the tests dir (application code)', () => {
+      const result = validatePatch(proposalAt(path.join(repoRoot, 'src', 'app.ts')), diagnosis, loginIntent, {
+        allowedTestsRoot: testsRoot
+      });
+      expect(result.valid).toBe(false);
+      expect(result.reason).toContain('generated tests');
+    });
+
+    it('refuses a sibling dir that merely shares the prefix', () => {
+      const result = validatePatch(proposalAt(path.join(repoRoot, 'e2e-evil', 'login.spec.ts')), diagnosis, loginIntent, {
+        allowedTestsRoot: testsRoot
+      });
+      expect(result.valid).toBe(false);
+    });
+
+    it('still refuses connected-repo paths under the default root', () => {
+      // Without an explicit root the boundary remains testpilot's tests/generated.
+      const result = validatePatch(proposalAt(path.join(testsRoot, 'login.spec.ts')), diagnosis, loginIntent);
+      expect(result.valid).toBe(false);
+    });
+  });
+
   // The point of the generalization: the guard protects an arbitrary flow, not just login.
   it('protects a non-login (checkout) flow via the intent', () => {
     const checkoutIntent: TestIntent = {

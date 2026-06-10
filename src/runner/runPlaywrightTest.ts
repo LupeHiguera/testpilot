@@ -10,6 +10,11 @@ export async function runPlaywrightTest(input: {
   baseUrl: string;
   route: string;
   variant?: string;
+  /** Root of the connected repo the test belongs to. When it is not testpilot's
+   *  own tree, the run happens INSIDE that repo (cwd) with the repo's own
+   *  Playwright install and config — mixing testpilot's runner with the repo's
+   *  `@playwright/test` would load the library twice and crash. */
+  repoRoot?: string;
 }): Promise<RunResult> {
   const runDir = createRunDir('run');
   await fs.mkdir(runDir, { recursive: true });
@@ -18,9 +23,15 @@ export async function runPlaywrightTest(input: {
     BASE_URL: input.baseUrl,
     DEMO_VARIANT: input.variant ?? ''
   };
-  const testPath = path.relative(projectRoot, input.testPath).replaceAll(path.sep, '/');
-  const args = ['playwright', 'test', testPath, '--config', path.join(projectRoot, 'playwright.config.ts'), '--output', runDir];
-  const result = await runCommand('npx', args, env);
+  const repoRoot = path.resolve(input.repoRoot ?? projectRoot);
+  const external = repoRoot !== projectRoot;
+  const testPath = path.relative(repoRoot, path.resolve(input.testPath)).replaceAll(path.sep, '/');
+  const args = external
+    ? // The connected repo's own toolchain: its playwright, its config (or
+      // Playwright defaults rooted at the repo when it has none).
+      ['playwright', 'test', testPath, '--output', runDir]
+    : ['playwright', 'test', testPath, '--config', path.join(projectRoot, 'playwright.config.ts'), '--output', runDir];
+  const result = await runCommand('npx', args, env, repoRoot);
   const passed = result.code === 0;
   const runResult: RunResult = {
     passed,
@@ -43,10 +54,10 @@ export async function runPlaywrightTest(input: {
   return runResult;
 }
 
-function runCommand(command: string, args: string[], env: NodeJS.ProcessEnv) {
+function runCommand(command: string, args: string[], env: NodeJS.ProcessEnv, cwd: string = projectRoot) {
   return new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
     const child = spawnCommand(command, args, {
-      cwd: projectRoot,
+      cwd,
       env,
       shell: false
     });

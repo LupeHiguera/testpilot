@@ -19,6 +19,9 @@ export interface CreateRepairPrInput {
   baseBranch?: string;
   /** When true, actually create a branch + GitHub PR via git/gh. Defaults to false (bundle only). */
   openPr?: boolean;
+  /** Root of the git repo the repair belongs to. Defaults to testpilot's own repo;
+   *  a connected project passes its repoPath so the branch/PR land in THAT repo. */
+  repoRoot?: string;
 }
 
 export interface RepairPrContent {
@@ -170,7 +173,8 @@ export async function createRepairPr(input: CreateRepairPrInput): Promise<Repair
     return result;
   }
 
-  const skippedReason = await checkPrPrerequisites();
+  const repoRoot = input.repoRoot ?? projectRoot;
+  const skippedReason = await checkPrPrerequisites(repoRoot);
   if (skippedReason) {
     result.skippedReason = skippedReason;
     return result;
@@ -182,6 +186,7 @@ export async function createRepairPr(input: CreateRepairPrInput): Promise<Repair
       title: content.title,
       baseBranch,
       stamp,
+      repoRoot,
       testPath: input.testPath,
       proposal: input.proposal,
       diagnosis: input.diagnosis,
@@ -206,12 +211,12 @@ async function copyIfPresent(source: string | undefined, destination: string) {
   });
 }
 
-async function checkPrPrerequisites(): Promise<string | undefined> {
-  const gh = await runCommand('gh', ['--version']);
+async function checkPrPrerequisites(repoRoot: string): Promise<string | undefined> {
+  const gh = await runCommand('gh', ['--version'], repoRoot);
   if (gh.code !== 0) {
     return 'GitHub CLI (gh) is not available; wrote the PR bundle instead.';
   }
-  const remote = await runCommand('git', ['remote', 'get-url', 'origin']);
+  const remote = await runCommand('git', ['remote', 'get-url', 'origin'], repoRoot);
   if (remote.code !== 0 || !remote.stdout.trim()) {
     return 'No git remote "origin" is configured; wrote the PR bundle instead.';
   }
@@ -223,6 +228,7 @@ async function openGithubPr(input: {
   title: string;
   baseBranch: string;
   stamp: string;
+  repoRoot: string;
   testPath: string;
   proposal: RepairProposal;
   diagnosis: Diagnosis;
@@ -231,8 +237,9 @@ async function openGithubPr(input: {
   afterScreenshot?: string;
   bodyPath: string;
 }): Promise<string> {
-  const relTest = path.relative(projectRoot, input.testPath);
-  const ownerRepo = parseGithubOwnerRepo((await runCommand('git', ['remote', 'get-url', 'origin'])).stdout);
+  const { repoRoot } = input;
+  const relTest = path.relative(repoRoot, input.testPath);
+  const ownerRepo = parseGithubOwnerRepo((await runCommand('git', ['remote', 'get-url', 'origin'], repoRoot)).stdout);
 
   // Stage tracked copies of the screenshots so they can be committed to the
   // branch and referenced by absolute raw URL in the PR body (relative paths do
@@ -241,63 +248,69 @@ async function openGithubPr(input: {
   let beforeRepoPath: string | undefined;
   let afterRepoPath: string | undefined;
   if (input.beforeScreenshot || input.afterScreenshot) {
-    await fs.mkdir(path.join(projectRoot, imageDirRel), { recursive: true });
-    beforeRepoPath = await copyIntoRepo(input.beforeScreenshot, path.join(imageDirRel, 'before.png'));
-    afterRepoPath = await copyIntoRepo(input.afterScreenshot, path.join(imageDirRel, 'after.png'));
+    await fs.mkdir(path.join(repoRoot, imageDirRel), { recursive: true });
+    beforeRepoPath = await copyIntoRepo(repoRoot, input.beforeScreenshot, path.join(imageDirRel, 'before.png'));
+    afterRepoPath = await copyIntoRepo(repoRoot, input.afterScreenshot, path.join(imageDirRel, 'after.png'));
   }
 
-  await git(['switch', '-c', input.branch]);
-  // Force-add so a generated test that is gitignored in the demo still lands in the PR branch.
-  await git(['add', '--force', relTest]);
-  const commitPaths = [relTest];
-  if (beforeRepoPath || afterRepoPath) {
-    await git(['add', '--force', imageDirRel]);
-    commitPaths.push(imageDirRel);
-  }
-  // Scope the commit to only these paths so nothing else staged (e.g. drafts) leaks in.
-  await git(['commit', '-m', input.title, '--', ...commitPaths]);
-  const sha = (await git(['rev-parse', 'HEAD'])).stdout.trim();
+  // Remember where the repo was so the checkout is restored afterwards — in a
+  // connected repo, leaving the user stranded on a testpilot branch is not ours
+  // to do. The repair commit lives on the pushed branch either way.
+  const originalRef = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], repoRoot)).stdout.trim();
+  await git(['switch', '-c', input.branch], repoRoot);
+  try {
+    // Force-add so a generated test that is gitignored in the demo still lands in the PR branch.
+    await git(['add', '--force', relTest], repoRoot);
+    const commitPaths = [relTest];
+    if (beforeRepoPath || afterRepoPath) {
+      await git(['add', '--force', imageDirRel], repoRoot);
+      commitPaths.push(imageDirRel);
+    }
+    // Scope the commit to only these paths so nothing else staged (e.g. drafts) leaks in.
+    await git(['commit', '-m', input.title, '--', ...commitPaths], repoRoot);
+    const sha = (await git(['rev-parse', 'HEAD'], repoRoot)).stdout.trim();
 
-  // Rebuild the body with absolute raw URLs (pinned to the commit SHA) so the
-  // before/after images render on GitHub. Fall back to relative refs if we
-  // could not determine owner/repo.
-  const body = buildRepairPrContent({
-    testPath: input.testPath,
-    proposal: input.proposal,
-    diagnosis: input.diagnosis,
-    intent: input.intent,
-    baseBranch: input.baseBranch,
-    stamp: input.stamp,
-    beforeImageRef: imageRef(ownerRepo, sha, beforeRepoPath, './before.png'),
-    afterImageRef: imageRef(ownerRepo, sha, afterRepoPath, './after.png')
-  }).body;
-  await fs.writeFile(input.bodyPath, body, 'utf8');
+    // Rebuild the body with absolute raw URLs (pinned to the commit SHA) so the
+    // before/after images render on GitHub. Fall back to relative refs if we
+    // could not determine owner/repo.
+    const body = buildRepairPrContent({
+      testPath: input.testPath,
+      proposal: input.proposal,
+      diagnosis: input.diagnosis,
+      intent: input.intent,
+      baseBranch: input.baseBranch,
+      stamp: input.stamp,
+      beforeImageRef: imageRef(ownerRepo, sha, beforeRepoPath, './before.png'),
+      afterImageRef: imageRef(ownerRepo, sha, afterRepoPath, './after.png')
+    }).body;
+    await fs.writeFile(input.bodyPath, body, 'utf8');
 
-  await git(['push', '-u', 'origin', input.branch]);
-  const pr = await runCommand('gh', [
-    'pr',
-    'create',
-    '--base',
-    input.baseBranch,
-    '--head',
-    input.branch,
-    '--title',
-    input.title,
-    '--body-file',
-    input.bodyPath
-  ]);
-  if (pr.code !== 0) {
-    throw new Error(pr.stderr || pr.stdout || 'gh pr create failed');
+    await git(['push', '-u', 'origin', input.branch], repoRoot);
+    const pr = await runCommand(
+      'gh',
+      ['pr', 'create', '--base', input.baseBranch, '--head', input.branch, '--title', input.title, '--body-file', input.bodyPath],
+      repoRoot
+    );
+    if (pr.code !== 0) {
+      throw new Error(pr.stderr || pr.stdout || 'gh pr create failed');
+    }
+    return pr.stdout.trim();
+  } finally {
+    if (originalRef && originalRef !== 'HEAD') {
+      await git(['switch', originalRef], repoRoot).catch(() => {
+        // Best effort: a failed switch-back leaves the repair branch checked out,
+        // which is recoverable by hand; never mask the primary error with this.
+      });
+    }
   }
-  return pr.stdout.trim();
 }
 
-async function copyIntoRepo(source: string | undefined, repoRelPath: string): Promise<string | undefined> {
+async function copyIntoRepo(repoRoot: string, source: string | undefined, repoRelPath: string): Promise<string | undefined> {
   if (!source) {
     return undefined;
   }
   try {
-    await fs.copyFile(source, path.join(projectRoot, repoRelPath));
+    await fs.copyFile(source, path.join(repoRoot, repoRelPath));
     return repoRelPath;
   } catch {
     return undefined;
@@ -330,20 +343,20 @@ export function parseGithubOwnerRepo(remoteUrl: string): { owner: string; repo: 
   return { owner: match[1], repo: match[2] };
 }
 
-async function git(args: string[]) {
-  const result = await runCommand('git', args);
+async function git(args: string[], cwd: string) {
+  const result = await runCommand('git', args, cwd);
   if (result.code !== 0) {
     throw new Error(`git ${args.join(' ')} failed: ${result.stderr || result.stdout}`);
   }
   return result;
 }
 
-function runCommand(command: string, args: string[]) {
+function runCommand(command: string, args: string[], cwd: string = projectRoot) {
   return new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
     const child =
       process.platform === 'win32'
-        ? spawn('cmd.exe', ['/c', command, ...args], { cwd: projectRoot, shell: false })
-        : spawn(command, args, { cwd: projectRoot, shell: false });
+        ? spawn('cmd.exe', ['/c', command, ...args], { cwd, shell: false })
+        : spawn(command, args, { cwd, shell: false });
     let stdout = '';
     let stderr = '';
     child.stdout?.on('data', (chunk) => {

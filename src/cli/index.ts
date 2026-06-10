@@ -315,6 +315,7 @@ specCmd
   .option('--title <title>', 'Story title')
   .option('--mode <mode>', 'Model mode: mock or openai', 'mock')
   .option('--vision', 'Refine diagnosis with a vision read of the failure screenshot')
+  .option('--open-pr', 'When a safe repair re-runs green, open a GitHub PR in the project repo (default: bundle only)')
   .action(async (projectId, file, options) => {
     const project = await getProject(projectId);
     if (!project) {
@@ -330,9 +331,18 @@ specCmd
     // testpilot manages the demo app; connected projects run their own dev server.
     const server = project.id === 'demo' ? await startDemoServer() : undefined;
     try {
-      const result = await runStoryPipeline(project, story, { mode: options.mode as ModelMode, vision: Boolean(options.vision) });
+      const result = await runStoryPipeline(project, story, {
+        mode: options.mode as ModelMode,
+        vision: Boolean(options.vision),
+        openPr: Boolean(options.openPr)
+      });
       console.log(`Story ${result.status}`);
       console.log(`Test ${result.testPath}`);
+      if (result.prUrl) {
+        console.log(`Repair PR ${result.prUrl}`);
+      } else if (result.prBundleDir) {
+        console.log(`Repair PR bundle ${result.prBundleDir}`);
+      }
     } finally {
       if (server) {
         stopProcessTree(server.pid);
