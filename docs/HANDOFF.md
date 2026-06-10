@@ -97,9 +97,11 @@ GitHub/Jira MCP story ingestion; living docs. See `README.md` for the full pictu
    `getByRole('button', { name })` the test drives whose label is gone from the
    page's CURRENT buttons (from the loop's fresh observation) to a role locator
    matching both old and current — a copy-change is repaired on ANY flow, and no
-   repair is fabricated when nothing maps. Known limit: the relabel repair sources
-   new labels from `observation.buttons`, so non-button controls (links) need the
-   artifact collector to capture them first.
+   repair is fabricated when nothing maps. The old known limit is closed
+   (2026-06-10): `src/browser/captureControls.ts` records every button-role
+   control (`<button>`, `[role=button]`, submit/button inputs, aria-label/value
+   aware) AND links, in both collectors; `widenRelabeledLocator` repairs
+   `getByRole('link', …)` drifts within the link pool (roles never cross-map).
 2. **Phase 2 — close the connected-repo loop (CORE DONE, 2026-06-10).** Safe repairs
    flow into a connected project's own repo: `validatePatch` scopes writes to the
    project's tests dir (`allowedTestsRoot` — still strict tests-dir containment,
