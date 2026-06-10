@@ -1,3 +1,4 @@
+
 # testpilot — session handoff / restart notes
 
 _Read this first in a fresh session, then `git log --oneline -25` for the trail._
