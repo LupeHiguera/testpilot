@@ -66,7 +66,8 @@ This is the heart of testpilot. A repair is only ever applied when **every** gua
 - **Generated-test guard** refuses to write a test that drops the spec's route or
   expected outcome, or that contains `.only`/`.skip`/`TODO`.
 - **Repair guard** refuses to remove assertions, change the expected business outcome,
-  or edit anything outside the generated-test directory.
+  or edit anything outside the generated-tests directory (testpilot's own, or a
+  connected project's tests dir — never application code).
 - **Human approval** — repairs are surfaced as a reviewable PR bundle or GitHub PR, never silently merged.
 
 ---
@@ -140,8 +141,10 @@ sources. Generated tests and docs are written **into the connected repo**.
 npm run testpilot -- project add acme --name "Acme web" --repo /path/to/acme \
   --base-url http://127.0.0.1:5173 --tests-dir tests/e2e
 
-# Upload a story (or use the dashboard's Stories panel)
-npm run testpilot -- spec add acme ./story.md
+# Upload a story (or use the dashboard's Stories panel). With --open-pr, a safe
+# repair that re-runs green is opened as a real GitHub PR in the project's repo
+# (default: a local reviewable PR bundle).
+npm run testpilot -- spec add acme ./story.md --open-pr
 
 # Pull stories from GitHub issues (testpilot acts as an MCP client to the GitHub MCP server)
 npm run testpilot -- spec pull acme --owner acme --repo web --label needs-test --generate
@@ -153,9 +156,17 @@ npm run testpilot -- spec pull-jira acme --jql "labels = needs-test"
 npm run testpilot -- docs acme
 ```
 
+Runnable connected projects execute their generated tests **inside their own repo
+with their own Playwright install**, and safe repairs flow back the same way:
+always as a reviewable PR bundle, optionally as a real branch + GitHub PR
+(`--open-pr`) — with your checkout's branch restored afterwards.
+
 **Story ingestion** uses real MCP connectors — testpilot is the MCP *client*
 (`src/mcp/client.ts`) and the GitHub/Jira MCP server launch is configurable per
-project. GitHub auth comes from `GITHUB_TOKEN` or `gh auth token`.
+project. The connectors paginate (GitHub `page`/`per_page`, Jira `startAt`),
+flatten Jira Cloud's ADF rich-text descriptions to plain text, and surface auth
+failures (private repo, bad token) as real errors instead of empty results.
+GitHub auth comes from `GITHUB_TOKEN` or `gh auth token`.
 
 **Living documentation** writes one markdown page per flow — the plain-English
 instructions, the derived steps, and a status backed by the flow's test. Because each
@@ -193,7 +204,7 @@ stays reproducible.
 | `repair <test> <run-result> <spec> [--open-pr] [--vision]` | Propose & apply a safe repair; bundle or open a PR. |
 | `serve [--port 4000]` | Start the live dashboard server. |
 | `project add\|list` | Register / list connected projects. |
-| `spec add <project> <file>` | Upload a story and run it. |
+| `spec add <project> <file> [--open-pr]` | Upload a story and run it; optionally PR a green repair into the project repo. |
 | `spec pull <project> --owner --repo [--label] [--generate]` | Pull GitHub issues as stories. |
 | `spec pull-jira <project> [--jql]` | Pull Jira issues as stories. |
 | `docs <project>` | Generate living documentation. |
@@ -236,14 +247,16 @@ npm run build          # typecheck only
 npm run test           # unit tests
 ```
 
-CI (`.github/workflows/ci.yml`) runs typecheck, unit tests, the dashboard build, and
-the end-to-end mock demo on every push and PR.
+CI (`.github/workflows/ci.yml`) runs typecheck, unit tests, the dashboard build,
+the end-to-end mock demo, and a **perf-budget gate** (`npm run perf:budget`: load
+time + DOM size scoped to the live canyon pane, results posted to the job summary)
+on every push and PR.
 
 ### How the dashboard was built
 
 The dashboard was developed with a two-agent loop kept honest by an MCP grader: a
 **coder** agent implements the UI; a **grader** agent scores it against a fixed
-7-criterion rubric using a real MCP server (`tools/grader-mcp/`) that captures
+8-criterion rubric using a real MCP server (`tools/grader-mcp/`) that captures
 multi-viewport screenshots, runs axe-core accessibility checks, and records grades.
 The rubric explicitly penalizes the generic "AI-generated dashboard" look, and a
 revision only passes when every criterion clears the bar.
@@ -254,10 +267,15 @@ revision only passes when every criterion clears the bar.
 
 - **Arbitrary-app test generation is best-effort.** The login demo is curated; real
   apps are harder. Generation is a starting point, always behind the human-approval gate.
-- **Repairs auto-apply only within the generated-test directory** (a deliberate safety
-  boundary). Writing repairs into arbitrary external repos is intentionally gated.
-- **Jira ingestion is code-complete but requires your Jira + Atlassian MCP server** to
-  run live; the GitHub connector is verified end-to-end.
+- **Repairs only ever write inside a tests directory** (testpilot's `tests/generated/`,
+  or a connected project's tests dir) — never application code. Repairs into a
+  connected repo land behind the PR gate: a reviewable bundle by default, a real
+  branch + GitHub PR on `--open-pr`.
+- **Runnable connected projects need `@playwright/test` installed** in their own repo
+  (tests run with the project's toolchain, not testpilot's).
+- **Both connectors are exercised end-to-end against a real MCP server** in the test
+  suite (pagination, errors, Jira ADF); pointing Jira at a live Atlassian instance
+  still requires your own Atlassian MCP endpoint + token.
 
 ---
 
