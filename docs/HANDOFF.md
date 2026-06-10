@@ -124,9 +124,13 @@ GitHub/Jira MCP story ingestion; living docs. See `README.md` for the full pictu
    endpoint + token (user-supplied) — run `spec pull-jira` against it; `spec pull`
    builds its GitHub config from CLI flags only (does not yet read the project's
    stored github source config).
-4. **Phase 4 — productionize the dashboard:** perf numbers as a CI job-summary; scope
-   the perf DOM count to `.canyon-main` so local run-history can't inflate it; auth
-   only if it ever leaves localhost.
+4. **Phase 4 — productionize the dashboard (DONE, 2026-06-10).** The perf DOM
+   budgets are scoped to the live canyon pane (`.canyon-pane`: idle ≤ 200,
+   full run ≤ 4500 — measured ~28/~3053), so the Expeditions history rail (which
+   grows with the local run archive) can't inflate them; whole-page totals are
+   reported ungated for trend tracking, and `perf:budget` appends a markdown
+   results table to the GitHub Actions job summary. Auth stays out of scope
+   while the server binds to 127.0.0.1 only.
 
 ## Watch-outs
 - Kill stray servers: PowerShell `Get-NetTCPConnection -LocalPort 4000,3000 -State
