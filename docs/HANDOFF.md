@@ -9,7 +9,7 @@ stays meaningful). A commander CLI + a live "Grand Canyon" SSE dashboard
 (`npm run serve` → :4000); `mock` (default) and `openai` (vision-assisted) modes;
 GitHub/Jira MCP story ingestion; living docs. See `README.md` for the full picture.
 
-## Current state (2026-06-08)
+## Current state (2026-06-10)
 - **Everything is committed & pushed.** `origin/main` is current; `git log --oneline`
   for hashes. Local-only drafts (`Draft.md`, `.snap.mjs`, `.vs/`) are git-ignored via
   `.git/info/exclude` — they will not stage even under `git add -A`.
@@ -21,10 +21,45 @@ GitHub/Jira MCP story ingestion; living docs. See `README.md` for the full pictu
   **Judgment Ledger** verdict moment (before/after plates + inline diff + stamped seal),
   carved "field-tablet" chrome everywhere, and a persistent **live beacon** on the
   in-flight ledge. (The old full-bleed "gorge" over-reach was rolled back long ago.)
-- **Backend is stable.** The safety core is the strongest part: `validatePatch` only
-  loosens toward refusal; `mergeVisionDiagnosis` lets vision veto but never authorize.
-- **Tests:** 64 unit tests (incl. `server.test.ts` pinning the path-traversal / CSRF /
-  body-cap guards). `npm run validate` = typecheck + tests.
+- **Backend is stable and freshly audited (2026-06-10).** The safety core is the
+  strongest part: `validatePatch` only loosens toward refusal; `mergeVisionDiagnosis`
+  lets vision veto but never authorize. A full audit fixed three real bugs
+  (`7c8229f`) and closed the whole nit backlog (`13a895f`) — see the session log below.
+- **Tests:** 86 unit tests (incl. `server.test.ts` pinning path-traversal / CSRF /
+  body-cap / CORS-absence, plus `runLock` and `waitForServer` backoff).
+  `npm run validate` = typecheck (both apps) + tests.
+
+## Session log 2026-06-09/10 (audit + hardening + UX polish)
+- **Audit fixes (`7c8229f`):** (1) `GET /api/stories?projectId=../../..` could walk
+  the stories join out of `.testpilot/projects` — project ids are now slug-validated
+  in `stories/store.ts` (hard guard) and the server returns a clean 400; (2) a demo-
+  server failure after `triggerStory`'s 202 crashed the whole live server (write on
+  a finished response → unhandled rejection) — post-202 failures are log-only and
+  `sendJson` no-ops once headers are sent; (3) the mock generator only escaped the
+  FIRST `/` of `expectedPath`, so multi-segment routes emitted a syntactically
+  invalid test — all slashes + regex specials now escaped (`pathRegexSource`), and
+  `validatePatch` un-escapes `\/` before its route-preservation check.
+- **Backlog closeout (`13a895f`):** dropped `Access-Control-Allow-Origin: *` from
+  the JSON API + SSE (dashboard is same-origin; Vite dev proxies — pinned by test);
+  new `src/server/runLock.ts` serializes runs (`POST /api/run|stories` → 409 while
+  one is in flight); `widenSubmitLocator` picks the relabel candidate by bigram
+  similarity and skips labels the test already drives; PR bundles are only written
+  when the applied repair re-ran green; `waitForServer` backs off on every failed
+  attempt (was hot-looping on non-ok) and takes a timeout param; shared
+  `src/generator/createPatch.ts` replaces the duplicated pseudo-diff helper.
+- **409 toast (`0de93b1`):** the dashboard surfaces refused triggers — `triggerRun`/
+  `uploadStory` return `{ started, error }`, and a refusal (run lock 409, 400, dead
+  server) shows a carved `.rim-toast` chip (polite live region, shape-coded "!" mark,
+  5s auto-dismiss + ×, reduced-motion gated, keeps typed story text). axe stays 0
+  with the toast visible.
+- **Type fix + hook fix (`35d65bc`):** `0de93b1` broke `typecheck:ui`
+  (`useRef<number>()` needs an explicit initial value under `@types/react` 19) and
+  its CI run FAILED — masked locally by piping build output through `tail` (pipeline
+  exit = tail's 0). Fixed the ref, and the Stop validate hook now writes combined
+  output to `/tmp/testpilot-validate.log` and emits the last 40 lines on **stderr**
+  before exiting 2, so a blocked stop states the actual error instead of
+  "No stderr output". **Lesson: never pipe a verdict command through `tail`/`head` —
+  check its exit code directly.**
 
 ## How to run / verify
 - `npm run validate` · `npm run build` · `npm run test` · `npm run perf:budget`
