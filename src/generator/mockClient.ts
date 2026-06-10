@@ -1,5 +1,6 @@
 import { parseSpec } from '../spec/parseSpec.js';
 import { Diagnosis, ModelClient, ObservationArtifacts, RepairProposal, RunResult, TestIntent, VisionDiagnosis } from '../core/types.js';
+import { createPatch } from './createPatch.js';
 
 export class MockModelClient implements ModelClient {
   async parseSpec(spec: string): Promise<TestIntent> {
@@ -94,7 +95,15 @@ function widenSubmitLocator(
     if (presentLower.includes(oldLabel.toLowerCase())) {
       continue; // the driven control is still on the page → not a relabel
     }
-    const newLabel = present.find((button) => button.toLowerCase() !== oldLabel.toLowerCase());
+    // Candidates are current buttons the test does not already reference — a
+    // label that appears in the test is some other control it drives, not the
+    // relabelled one. Among those, prefer the label that reads most like the old
+    // one, so a multi-button page maps "Sign in" → "Log in", not "Forgot password".
+    const candidates = present.filter(
+      (button) =>
+        button.toLowerCase() !== oldLabel.toLowerCase() && !testContent.toLowerCase().includes(button.toLowerCase())
+    );
+    const newLabel = pickClosestLabel(oldLabel, candidates);
     if (!newLabel) {
       continue; // no current button to map the drifted label onto
     }
@@ -106,12 +115,41 @@ function widenSubmitLocator(
   return null;
 }
 
-function createPatch(filePath: string, before: string, after: string) {
-  return [
-    `--- ${filePath}`,
-    `+++ ${filePath} (repaired)`,
-    '@@',
-    ...before.split('\n').map((line) => `-${line}`),
-    ...after.split('\n').map((line) => `+${line}`)
-  ].join('\n');
+/** The candidate most similar to the old label by character-bigram overlap
+ *  (Dice coefficient); ties keep page order. A zero score still wins when it is
+ *  the only candidate — a lone remaining button is the relabel by elimination. */
+function pickClosestLabel(oldLabel: string, candidates: string[]): string | undefined {
+  let best: string | undefined;
+  let bestScore = -1;
+  for (const candidate of candidates) {
+    const score = bigramSimilarity(oldLabel.toLowerCase(), candidate.toLowerCase());
+    if (score > bestScore) {
+      best = candidate;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
+function bigramSimilarity(a: string, b: string): number {
+  const bigramsA = bigrams(a);
+  const bigramsB = bigrams(b);
+  if (bigramsA.size === 0 || bigramsB.size === 0) {
+    return a === b ? 1 : 0;
+  }
+  let shared = 0;
+  for (const gram of bigramsA) {
+    if (bigramsB.has(gram)) {
+      shared += 1;
+    }
+  }
+  return (2 * shared) / (bigramsA.size + bigramsB.size);
+}
+
+function bigrams(value: string): Set<string> {
+  const grams = new Set<string>();
+  for (let i = 0; i < value.length - 1; i += 1) {
+    grams.add(value.slice(i, i + 2));
+  }
+  return grams;
 }

@@ -26,8 +26,8 @@ export async function startDemoServer() {
   return child;
 }
 
-export async function waitForServer(url: string) {
-  const deadline = Date.now() + 20_000;
+export async function waitForServer(url: string, timeoutMs = 20_000) {
+  const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
       const response = await fetch(url);
@@ -35,8 +35,11 @@ export async function waitForServer(url: string) {
         return;
       }
     } catch {
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      // Not accepting connections yet.
     }
+    // Back off on EVERY failed attempt — a server that answers non-ok (e.g. a
+    // crashing 500) would otherwise be hammered in a tight loop until the deadline.
+    await new Promise((resolve) => setTimeout(resolve, 300));
   }
   throw new Error(`Timed out waiting for demo server at ${url}`);
 }

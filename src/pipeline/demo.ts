@@ -106,7 +106,9 @@ export async function runDemoPipeline({ mode, model, baseUrl }: DemoOptions): Pr
     const repairApplied = copyRepair.repairApplied;
     const copyRepairPassed = copyRepair.status === 'passing';
     let prBundleDir: string | undefined;
-    if (repairApplied && proposal) {
+    // Only bundle a repair that re-ran green: an applied-but-still-failing patch
+    // is escalated as needs-review, not handed to a human as a proposed PR.
+    if (repairApplied && proposal && copyRepairPassed) {
       // Bundle the applied repair for human review, reusing the loop's last
       // observation as the "after" screenshot (no extra browser launch).
       const pr = await createRepairPr({

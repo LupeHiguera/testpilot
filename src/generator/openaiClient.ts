@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import { parseSpec } from '../spec/parseSpec.js';
 import { Diagnosis, FailureCategory, ModelClient, ObservationArtifacts, RepairProposal, RunResult, TestIntent, VisionDiagnosis } from '../core/types.js';
 import { FAILURE_CATEGORIES } from '../diagnosis/categories.js';
+import { createPatch } from './createPatch.js';
 import { MockModelClient } from './mockClient.js';
 
 export class OpenAiModelClient implements ModelClient {
@@ -197,14 +198,4 @@ export class OpenAiModelClient implements ModelClient {
       reason: typeof parsed.reason === 'string' && parsed.reason ? parsed.reason : 'Vision model returned no reason.'
     };
   }
-}
-
-function createPatch(filePath: string, before: string, after: string) {
-  return [
-    `--- ${filePath}`,
-    `+++ ${filePath} (repaired)`,
-    '@@',
-    ...before.split('\n').map((line) => `-${line}`),
-    ...after.split('\n').map((line) => `+${line}`)
-  ].join('\n');
 }

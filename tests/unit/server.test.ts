@@ -49,6 +49,14 @@ describe('live server security guards', () => {
     expect(res.status).toBe(400);
   });
 
+  it('does not expose the API cross-origin (no Access-Control-Allow-Origin)', async () => {
+    // The dashboard is same-origin (Vite dev proxies to this server); a CORS
+    // header here would let any website read local run data.
+    const res = await fetch(`${base}/api/projects`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('access-control-allow-origin')).toBeNull();
+  });
+
   it('rejects a traversal projectId on GET /api/stories', async () => {
     // Without the slug guard this would readdir outside .testpilot/projects.
     const res = await fetch(`${base}/api/stories?projectId=${encodeURIComponent('../../..')}`);

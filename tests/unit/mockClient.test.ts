@@ -87,6 +87,43 @@ describe('MockModelClient.proposeRepair', () => {
     expect(proposal.proposedContent).not.toContain('Log in'); // nothing login-specific leaked
   });
 
+  it('picks the closest current button on a multi-button page', async () => {
+    const proposal = await client.proposeRepair({
+      testPath: 'x.spec.ts',
+      testContent: testFor('Sign in'),
+      diagnosis,
+      runResult,
+      // Page order would pick "Forgot password"; similarity must pick "Log in".
+      observation: observation(['Forgot password', 'Log in'])
+    });
+
+    expect(proposal.safeToApply).toBe(true);
+    expect(proposal.proposedContent).toContain('/^(Sign in|Log in)$/');
+  });
+
+  it('never maps onto a button the test already drives', async () => {
+    const content = `import { expect, test } from '@playwright/test';
+test('flow', async ({ page }) => {
+  await page.goto('/x');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page).toHaveURL(/\\/done/);
+  await expect(page.getByText('Done')).toBeVisible();
+});`;
+    const proposal = await client.proposeRepair({
+      testPath: 'x.spec.ts',
+      testContent: content,
+      diagnosis,
+      runResult,
+      observation: observation(['Continue', 'Log in'])
+    });
+
+    // "Continue" is still present AND already driven by the test — only the
+    // drifted "Sign in" is widened, and onto the unreferenced "Log in".
+    expect(proposal.proposedContent).toContain("{ name: 'Continue' }");
+    expect(proposal.proposedContent).toContain('/^(Sign in|Log in)$/');
+  });
+
   it('proposes no repair when no current button maps to the driven control', async () => {
     const proposal = await client.proposeRepair({
       testPath: 'x.spec.ts',

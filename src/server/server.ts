@@ -11,6 +11,7 @@ import { startDemoServer, stopProcessTree } from '../pipeline/demoServer.js';
 import { runStoryPipeline } from '../pipeline/story.js';
 import { getProject, listProjects } from '../projects/store.js';
 import { addStory, isValidProjectId, listStories } from '../stories/store.js';
+import { releaseRunLock, tryAcquireRunLock } from './runLock.js';
 
 const uiDist = path.join(projectRoot, 'ui', 'dist');
 
@@ -85,8 +86,7 @@ function handleSse(req: http.IncomingMessage, res: http.ServerResponse) {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
-    Connection: 'keep-alive',
-    'Access-Control-Allow-Origin': '*'
+    Connection: 'keep-alive'
   });
   res.write('retry: 2000\n\n');
   const unsubscribe = onPipelineEvent((event) => {
@@ -181,10 +181,15 @@ async function triggerRun(req: http.IncomingMessage, res: http.ServerResponse) {
   const parsed = await readMutation(req, res);
   if (!parsed) return;
   const mode: ModelMode = parsed.mode === 'openai' ? 'openai' : 'mock';
+  if (!tryAcquireRunLock()) {
+    return sendJson(res, { error: 'a run is already in progress' }, 409);
+  }
   // Fire-and-forget: events stream over SSE; failures surface as a decision event.
-  runDemoWithServer({ mode, model: undefined, baseUrl: 'http://127.0.0.1:3000' }).catch((error) => {
-    console.error('Live run failed:', error);
-  });
+  runDemoWithServer({ mode, model: undefined, baseUrl: 'http://127.0.0.1:3000' })
+    .catch((error) => {
+      console.error('Live run failed:', error);
+    })
+    .finally(releaseRunLock);
   sendJson(res, { started: true, mode }, 202);
 }
 
@@ -196,28 +201,35 @@ async function triggerStory(req: http.IncomingMessage, res: http.ServerResponse)
     if (!project || !parsed.body) {
       return sendJson(res, { error: 'projectId and body are required' }, 400);
     }
-    const story = await addStory({
-      projectId: project.id,
-      source: 'upload',
-      title: (parsed.title as string) || String(parsed.body).trim().slice(0, 60),
-      body: parsed.body as string
-    });
-    sendJson(res, { started: true, storyId: story.id }, 202);
-    // The 202 is sent: from here on a failure (e.g. the demo server not coming
-    // up) must only be logged — attempting another response would throw on the
-    // finished stream and crash the process.
+    if (!tryAcquireRunLock()) {
+      return sendJson(res, { error: 'a run is already in progress' }, 409);
+    }
     try {
-      // testpilot manages the demo app; connected projects run their own dev server.
-      const appServer = project.id === 'demo' ? await startDemoServer() : undefined;
+      const story = await addStory({
+        projectId: project.id,
+        source: 'upload',
+        title: (parsed.title as string) || String(parsed.body).trim().slice(0, 60),
+        body: parsed.body as string
+      });
+      sendJson(res, { started: true, storyId: story.id }, 202);
+      // The 202 is sent: from here on a failure (e.g. the demo server not coming
+      // up) must only be logged — attempting another response would throw on the
+      // finished stream and crash the process.
       try {
-        await runStoryPipeline(project, story, { mode: 'mock' });
-      } finally {
-        if (appServer) {
-          stopProcessTree(appServer.pid);
+        // testpilot manages the demo app; connected projects run their own dev server.
+        const appServer = project.id === 'demo' ? await startDemoServer() : undefined;
+        try {
+          await runStoryPipeline(project, story, { mode: 'mock' });
+        } finally {
+          if (appServer) {
+            stopProcessTree(appServer.pid);
+          }
         }
+      } catch (error) {
+        console.error('Story run failed:', error);
       }
-    } catch (error) {
-      console.error('Story run failed:', error);
+    } finally {
+      releaseRunLock();
     }
   } catch (error) {
     sendJson(res, { error: String(error) }, 500);
@@ -337,7 +349,10 @@ function sendJson(res: http.ServerResponse, body: unknown, status = 200) {
     // catch, become an unhandled rejection that kills the process.
     return;
   }
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
+  // No Access-Control-Allow-Origin: the dashboard is same-origin (the Vite dev
+  // server proxies /api, /events, and /artifacts), so exposing the API
+  // cross-origin would only let arbitrary websites read local run data.
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(body));
 }
 
