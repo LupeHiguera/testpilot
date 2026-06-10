@@ -16,7 +16,7 @@ test('${intent.name}', async ({ page }) => {
   await page.getByLabel('Email').fill('${intent.credentials.email}');
   await page.getByLabel('Password').fill('${intent.credentials.password}');
   await page.getByRole('button', { name: '${intent.submitText}' }).click();
-  await expect(page).toHaveURL(/${intent.expectedPath.replace('/', '\\/')}/);
+  await expect(page).toHaveURL(/${pathRegexSource(intent.expectedPath)}/);
   await expect(page.getByText('${intent.expectedText}')).toBeVisible();
 });
 `;
@@ -62,6 +62,13 @@ test('${intent.name}', async ({ page }) => {
 
 function escapeForRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Escape a URL path for use inside an emitted `/.../` regex literal. Every `/`
+ *  must be escaped too — an unescaped one would terminate the literal early and
+ *  make the generated test a syntax error (e.g. a multi-segment `/app/dashboard`). */
+function pathRegexSource(routePath: string): string {
+  return escapeForRegex(routePath).replaceAll('/', '\\/');
 }
 
 /**

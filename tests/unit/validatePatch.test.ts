@@ -36,6 +36,18 @@ describe('validatePatch', () => {
     expect(validatePatch(makeProposal(content), diagnosis, loginIntent).valid).toBe(false);
   });
 
+  it('finds a multi-segment expected route escaped inside a regex literal', () => {
+    const intent: TestIntent = { ...loginIntent, expectedPath: '/app/dashboard' };
+    const content = `import { expect, test } from '@playwright/test';
+test('login', async ({ page }) => {
+  await page.goto('/login');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page).toHaveURL(/\\/app\\/dashboard/);
+  await expect(page.getByText('Welcome, Demo User')).toBeVisible();
+});`;
+    expect(validatePatch(makeProposal(content), diagnosis, intent).valid).toBe(true);
+  });
+
   it('rejects product regression repairs regardless of content', () => {
     const result = validatePatch(makeProposal(loginContent()), {
       category: 'PRODUCT_REGRESSION',

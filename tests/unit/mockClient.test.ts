@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { MockModelClient } from '../../src/generator/mockClient.js';
-import { Diagnosis, ObservationArtifacts, RunResult } from '../../src/core/types.js';
+import { Diagnosis, ObservationArtifacts, RunResult, TestIntent } from '../../src/core/types.js';
 
 const client = new MockModelClient();
 const diagnosis: Diagnosis = { category: 'UI_COPY_CHANGE', confidence: 0.9, reason: 'copy changed', repairable: true };
@@ -21,6 +21,28 @@ test('flow', async ({ page }) => {
   await expect(page.getByText('Done')).toBeVisible();
 });`;
 }
+
+describe('MockModelClient.generateTest', () => {
+  it('emits a valid URL regex for a multi-segment expected path', async () => {
+    const intent: TestIntent = {
+      name: 'flow',
+      route: '/login',
+      credentials: { email: 'a@b.c', password: 'pw' },
+      expectedPath: '/app/dashboard',
+      expectedText: 'Welcome',
+      submitText: 'Sign in',
+      originalSpec: 'spec'
+    };
+    const content = await client.generateTest(intent, observation([]));
+
+    // Every slash is escaped; an unescaped one would end the regex literal early
+    // and make the generated file a syntax error.
+    expect(content).toContain('toHaveURL(/\\/app\\/dashboard/)');
+    const literal = content.match(/toHaveURL\(\/(.+)\/\)/)?.[1];
+    expect(literal).toBeDefined();
+    expect(new RegExp(literal!).test('http://127.0.0.1:3000/app/dashboard')).toBe(true);
+  });
+});
 
 describe('MockModelClient.proposeRepair', () => {
   it('widens the submit selector to match the old and current label (login demo case)', async () => {

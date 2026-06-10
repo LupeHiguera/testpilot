@@ -34,11 +34,12 @@ export function validatePatch(
     return { valid: false, reason: 'The repair removed all assertions.' };
   }
   // The route assertion must survive: a URL assertion that still targets the
-  // intent's expected path (the path appears even inside the escaped regex form).
+  // intent's expected path. Un-escape `\/` first so the path is found even when
+  // it sits inside a regex literal (where every slash is escaped).
   if (!/toHaveURL|waitForURL/.test(content)) {
     return { valid: false, reason: 'The repair removed the route assertion.' };
   }
-  if (intent.expectedPath && !content.includes(intent.expectedPath)) {
+  if (intent.expectedPath && !content.replaceAll('\\/', '/').includes(intent.expectedPath)) {
     return { valid: false, reason: `The repair no longer asserts the expected route (${intent.expectedPath}).` };
   }
   // The expected-outcome assertion (the visible text the flow should reach) must survive.

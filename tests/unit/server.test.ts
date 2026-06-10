@@ -49,6 +49,18 @@ describe('live server security guards', () => {
     expect(res.status).toBe(400);
   });
 
+  it('rejects a traversal projectId on GET /api/stories', async () => {
+    // Without the slug guard this would readdir outside .testpilot/projects.
+    const res = await fetch(`${base}/api/stories?projectId=${encodeURIComponent('../../..')}`);
+    expect(res.status).toBe(400);
+  });
+
+  it('still serves stories for a well-formed project id', async () => {
+    const res = await fetch(`${base}/api/stories?projectId=demo`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(await res.json())).toBe(true);
+  });
+
   it('rejects an oversized request body', async () => {
     const big = 'x'.repeat(1_000_050);
     const res = await fetch(`${base}/api/run`, {

@@ -10,7 +10,7 @@ import { runDemoWithServer } from '../pipeline/demo.js';
 import { startDemoServer, stopProcessTree } from '../pipeline/demoServer.js';
 import { runStoryPipeline } from '../pipeline/story.js';
 import { getProject, listProjects } from '../projects/store.js';
-import { addStory, listStories } from '../stories/store.js';
+import { addStory, isValidProjectId, listStories } from '../stories/store.js';
 
 const uiDist = path.join(projectRoot, 'ui', 'dist');
 
@@ -58,7 +58,12 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
     return sendJson(res, await listProjects());
   }
   if (pathname === '/api/stories' && req.method === 'GET') {
-    return sendJson(res, await listStories(url.searchParams.get('projectId') ?? 'demo'));
+    const projectId = url.searchParams.get('projectId') ?? 'demo';
+    // A non-slug id would walk the stories dir join out of the registry root.
+    if (!isValidProjectId(projectId)) {
+      return sendJson(res, { error: 'invalid projectId' }, 400);
+    }
+    return sendJson(res, await listStories(projectId));
   }
   if (pathname === '/api/stories' && req.method === 'POST') {
     return triggerStory(req, res);
@@ -198,16 +203,21 @@ async function triggerStory(req: http.IncomingMessage, res: http.ServerResponse)
       body: parsed.body as string
     });
     sendJson(res, { started: true, storyId: story.id }, 202);
-    // testpilot manages the demo app; connected projects run their own dev server.
-    const appServer = project.id === 'demo' ? await startDemoServer() : undefined;
+    // The 202 is sent: from here on a failure (e.g. the demo server not coming
+    // up) must only be logged — attempting another response would throw on the
+    // finished stream and crash the process.
     try {
-      await runStoryPipeline(project, story, { mode: 'mock' });
+      // testpilot manages the demo app; connected projects run their own dev server.
+      const appServer = project.id === 'demo' ? await startDemoServer() : undefined;
+      try {
+        await runStoryPipeline(project, story, { mode: 'mock' });
+      } finally {
+        if (appServer) {
+          stopProcessTree(appServer.pid);
+        }
+      }
     } catch (error) {
       console.error('Story run failed:', error);
-    } finally {
-      if (appServer) {
-        stopProcessTree(appServer.pid);
-      }
     }
   } catch (error) {
     sendJson(res, { error: String(error) }, 500);
@@ -321,6 +331,12 @@ async function readJson(filePath: string): Promise<Record<string, unknown> | und
 }
 
 function sendJson(res: http.ServerResponse, body: unknown, status = 200) {
+  if (res.headersSent) {
+    // The response already went out (e.g. an error surfaced after a 202);
+    // writing headers again would throw — and, from the server's top-level
+    // catch, become an unhandled rejection that kills the process.
+    return;
+  }
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
   res.end(JSON.stringify(body));
 }

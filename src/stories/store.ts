@@ -4,7 +4,16 @@ import path from 'node:path';
 import { projectRoot } from '../core/config.js';
 import { Story } from './types.js';
 
+/** A project id must be a single path segment (slug). Anything else — separators,
+ *  `..` — would let a caller walk the join below out of the registry root. */
+export function isValidProjectId(projectId: string): boolean {
+  return /^[A-Za-z0-9_-]+$/.test(projectId);
+}
+
 function storyDir(projectId: string): string {
+  if (!isValidProjectId(projectId)) {
+    throw new Error(`Invalid project id: ${projectId}`);
+  }
   return path.join(projectRoot, '.testpilot', 'projects', projectId, 'stories');
 }
 
