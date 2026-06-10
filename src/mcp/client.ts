@@ -71,14 +71,21 @@ export async function withMcpClient<T>(config: McpServerConfig, fn: (client: Cli
   }
 }
 
-/** Call a tool and return the concatenated text content. */
+/** Call a tool and return the concatenated text content. A tool-level error
+ *  (isError — e.g. a 401/404 from a private repo or a bad token) is THROWN with
+ *  the server's message, instead of being returned as "data" that a caller
+ *  would try to JSON.parse into a cryptic crash or an empty result. */
 export async function callToolText(client: Client, name: string, args: Record<string, unknown>): Promise<string> {
   const result = await client.callTool({ name, arguments: args });
   const content = (result.content ?? []) as Array<{ type: string; text?: string }>;
-  return content
+  const text = content
     .filter((part) => part.type === 'text' && typeof part.text === 'string')
     .map((part) => part.text as string)
     .join('\n');
+  if (result.isError) {
+    throw new Error(`MCP tool "${name}" failed: ${text || 'no error detail provided'}`);
+  }
+  return text;
 }
 
 function inheritedEnv(extra?: Record<string, string>): Record<string, string> {

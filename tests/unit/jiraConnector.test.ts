@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { issuesToStories, jiraIssueToStory } from '../../src/connectors/jira.js';
+import { adfToText, issuesToStories, jiraIssueToStory } from '../../src/connectors/jira.js';
 
 describe('jira connector mapping', () => {
   it('maps a flattened jira issue', () => {
@@ -24,5 +24,50 @@ describe('jira connector mapping', () => {
       { key: 'A-2', summary: 'y' }
     ]);
     expect(stories.map((s) => s.externalId)).toEqual(['A-1', 'A-2']);
+  });
+
+  it('flattens a v3 ADF description to plain text', () => {
+    const story = jiraIssueToStory({
+      key: 'QA-7',
+      summary: 'Cart',
+      description: {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              { type: 'text', text: 'Open the cart' },
+              { type: 'text', text: ' and pay' }
+            ]
+          },
+          { type: 'paragraph', content: [{ type: 'text', text: 'Expect a receipt' }] }
+        ]
+      }
+    });
+    expect(story.body).toBe('Open the cart and pay\nExpect a receipt');
+  });
+});
+
+describe('adfToText', () => {
+  it('passes strings through and handles empties', () => {
+    expect(adfToText('plain')).toBe('plain');
+    expect(adfToText(undefined)).toBe('');
+    expect(adfToText({ type: 'doc', content: [] })).toBe('');
+  });
+
+  it('separates list items with newlines', () => {
+    const text = adfToText({
+      type: 'doc',
+      content: [
+        {
+          type: 'bulletList',
+          content: [
+            { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'first' }] }] },
+            { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'second' }] }] }
+          ]
+        }
+      ]
+    });
+    expect(text).toBe('first\nsecond');
   });
 });

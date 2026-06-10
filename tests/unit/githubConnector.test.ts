@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { issuesToStories, issueToStory } from '../../src/connectors/github.js';
+import { issuesToStories, issueToStory, parseIssuesPayload } from '../../src/connectors/github.js';
 
 describe('github connector mapping', () => {
   it('maps an issue to a story', () => {
@@ -23,5 +23,18 @@ describe('github connector mapping', () => {
     ]);
     expect(stories).toHaveLength(1);
     expect(stories[0].externalId).toBe('#1');
+  });
+});
+
+describe('parseIssuesPayload', () => {
+  it('accepts a bare array and an { issues } wrapper', () => {
+    expect(parseIssuesPayload('[{"number":1}]')).toEqual([{ number: 1 }]);
+    expect(parseIssuesPayload('{"issues":[{"number":2}]}')).toEqual([{ number: 2 }]);
+    expect(parseIssuesPayload('')).toEqual([]);
+    expect(parseIssuesPayload('{"unrelated":true}')).toEqual([]);
+  });
+
+  it('throws with the payload head on non-JSON (e.g. an HTML error page)', () => {
+    expect(() => parseIssuesPayload('<html>404 Not Found</html>')).toThrow(/unparseable.*404 Not Found/s);
   });
 });
