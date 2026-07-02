@@ -115,9 +115,13 @@ GitHub/Jira MCP story ingestion; living docs. See `README.md` for the full pictu
    remote (2026-07-01: a throwaway public repo; `spec add --open-pr` opened a
    real PR with the widened-locator diff, SHA-pinned before/after screenshot
    URLs that resolve, commit scoped to the test + images, and the repo left
-   back on `main`). REMAINING: the dashboard story form has no open-PR control
-   (bundle-only there); a connected repo must have `@playwright/test` installed
-   for `runnable: true`.
+   back on `main`). The dashboard story form now has an "Open a GitHub PR if a
+   safe repair lands" toggle (default OFF, sticky per session): checkbox →
+   `POST /api/stories` `openPr` → `runStoryPipeline` — live-verified by driving
+   the built UI against a no-remote external repo (the `pr` SSE event carries
+   the "No git remote" skippedReason, proving the flag flowed; axe 0 with the
+   toggle visible). REMAINING: a connected repo must have `@playwright/test`
+   installed for `runnable: true`.
 3. **Phase 3 — connectors (HARDENED, 2026-06-10).** `callToolText` throws on
    tool-level MCP errors (a private repo / bad token reads as what it is, not a
    JSON.parse crash or empty list); GitHub paginates (`page`/`per_page` default,

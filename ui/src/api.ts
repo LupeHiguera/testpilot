@@ -64,7 +64,14 @@ export async function listStories(projectId: string): Promise<Story[]> {
   return response.json();
 }
 
-export async function uploadStory(input: { projectId: string; title?: string; body: string }): Promise<TriggerResult> {
+export async function uploadStory(input: {
+  projectId: string;
+  title?: string;
+  body: string;
+  /** When true, a safe repair that re-runs green is opened as a real GitHub PR
+   *  in the project's repo (default: a local reviewable bundle only). */
+  openPr?: boolean;
+}): Promise<TriggerResult> {
   return toTriggerResult(
     fetch('/api/stories', {
       method: 'POST',

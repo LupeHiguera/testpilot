@@ -219,7 +219,9 @@ async function triggerStory(req: http.IncomingMessage, res: http.ServerResponse)
         // testpilot manages the demo app; connected projects run their own dev server.
         const appServer = project.id === 'demo' ? await startDemoServer() : undefined;
         try {
-          await runStoryPipeline(project, story, { mode: 'mock' });
+          // openPr only ever WIDENS the delivery of an already-green safe repair
+          // (bundle → real branch + GitHub PR); the repair guardrails are upstream.
+          await runStoryPipeline(project, story, { mode: 'mock', openPr: parsed.openPr === true });
         } finally {
           if (appServer) {
             stopProcessTree(appServer.pid);

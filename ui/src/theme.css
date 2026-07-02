@@ -1930,6 +1930,58 @@ button.secondary {
     ),
     linear-gradient(180deg, var(--slot-well-1) 0%, var(--slot-well-2) 100%);
 }
+/* The open-PR toggle: a small carved seal-slot beside an engraved caption. The
+   box is the same sunk well as the story slots; checking it strikes a sun mark
+   into the stone so the standing "deliver repairs as a PR" choice reads at a
+   glance without breaking the field-tablet register. */
+.slate-check {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  cursor: pointer;
+}
+.slate-check-box {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  flex: none;
+  margin: 0;
+  cursor: pointer;
+  background: linear-gradient(180deg, var(--slot-well-1) 0%, var(--slot-well-2) 100%);
+  border: var(--px) solid var(--tablet-base);
+  border-radius: 0;
+  box-shadow:
+    inset 0 var(--px) var(--px) var(--slot-top-shadow),
+    inset 0 calc(-1 * var(--px)) 0 var(--slot-base-lip);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.slate-check-box:checked {
+  border-color: var(--sun);
+  /* the struck mark: a solid sun square set into the well, framed by the slot */
+  background:
+    linear-gradient(var(--sun), var(--sun)) 50% 50% / 6px 6px no-repeat,
+    linear-gradient(180deg, var(--slot-well-1) 0%, var(--slot-well-2) 100%);
+  box-shadow:
+    inset 0 var(--px) var(--px) var(--slot-top-shadow),
+    inset 0 calc(-1 * var(--px)) 0 var(--sun);
+}
+.slate-check-box:focus-visible {
+  outline: calc(2 * var(--px)) solid var(--sun);
+  outline-offset: 2px;
+}
+.slate-check-text {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--sand-dim);
+  text-shadow: 0 var(--px) 0 var(--engrave);
+}
+.slate-check:hover .slate-check-text,
+.slate-check-box:checked ~ .slate-check-text {
+  color: var(--sand);
+}
+
 /* The submit reads as a stamped dispatch: chunky key-cap with a stamped lip. */
 .dispatch-btn {
   align-self: stretch;

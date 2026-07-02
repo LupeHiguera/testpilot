@@ -66,6 +66,9 @@ export function App() {
   const [stories, setStories] = useState<Story[]>([]);
   const [storyTitle, setStoryTitle] = useState('');
   const [storyBody, setStoryBody] = useState('');
+  // Sticky per session (not cleared on send): opening real PRs is a standing
+  // choice about where repairs are delivered, not part of one story's text.
+  const [openPr, setOpenPr] = useState(false);
   // One-shot "dispatched" flash: set true the instant a story is sent, cleared
   // after the confirm animation window so the slate flashes sunlit once on
   // submit (a quick commit acknowledgement). Reduced-motion gated in CSS.
@@ -139,7 +142,7 @@ export function App() {
     }
     setSelected(null);
     setRunning(true);
-    const result = await uploadStory({ projectId, title: storyTitle.trim() || undefined, body: storyBody });
+    const result = await uploadStory({ projectId, title: storyTitle.trim() || undefined, body: storyBody, openPr });
     if (!result.started) {
       // Keep the typed story so a refusal (run in flight, server down) loses nothing.
       setRunning(false);
@@ -241,6 +244,17 @@ export function App() {
                   rows={4}
                   aria-label="Story instructions"
                 />
+              </label>
+              {/* Default OFF: checking it makes a green safe repair open a real
+                  GitHub PR in the project's repo instead of only a local bundle. */}
+              <label className="slate-check">
+                <input
+                  type="checkbox"
+                  className="slate-check-box"
+                  checked={openPr}
+                  onChange={(event) => setOpenPr(event.target.checked)}
+                />
+                <span className="slate-check-text">Open a GitHub PR if a safe repair lands</span>
               </label>
               <button type="submit" className="dispatch-btn" disabled={running || !storyBody.trim()}>
                 {running ? 'Running…' : '▾ Generate test'}
