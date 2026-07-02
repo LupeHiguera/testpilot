@@ -149,6 +149,10 @@ npm run testpilot -- spec add acme ./story.md --open-pr
 # Pull stories from GitHub issues (testpilot acts as an MCP client to the GitHub MCP server)
 npm run testpilot -- spec pull acme --owner acme --repo web --label needs-test --generate
 
+# Or store the source once, then pull with no flags (flags override the stored config)
+npm run testpilot -- project add-source acme --type github --owner acme --repo web --label needs-test
+npm run testpilot -- spec pull acme --generate
+
 # Pull from Jira via a configured Jira MCP server
 npm run testpilot -- spec pull-jira acme --jql "labels = needs-test"
 
@@ -159,7 +163,10 @@ npm run testpilot -- docs acme
 Runnable connected projects execute their generated tests **inside their own repo
 with their own Playwright install**, and safe repairs flow back the same way:
 always as a reviewable PR bundle, optionally as a real branch + GitHub PR
-(`--open-pr`) — with your checkout's branch restored afterwards.
+(`--open-pr`). The opened PR carries the diagnosis, the exact diff, the guardrail
+checklist, and before/after screenshots (committed to the branch and pinned to its
+SHA so they render in the PR body) — and your checkout's branch is restored
+afterwards, so testpilot never leaves the repo mid-repair.
 
 **Story ingestion** uses real MCP connectors — testpilot is the MCP *client*
 (`src/mcp/client.ts`) and the GitHub/Jira MCP server launch is configurable per
@@ -204,8 +211,9 @@ stays reproducible.
 | `repair <test> <run-result> <spec> [--open-pr] [--vision]` | Propose & apply a safe repair; bundle or open a PR. |
 | `serve [--port 4000]` | Start the live dashboard server. |
 | `project add\|list` | Register / list connected projects. |
+| `project add-source <project> --type jira\|github ...` | Store a story source (repo, JQL, MCP server) on a project. |
 | `spec add <project> <file> [--open-pr]` | Upload a story and run it; optionally PR a green repair into the project repo. |
-| `spec pull <project> --owner --repo [--label] [--generate]` | Pull GitHub issues as stories. |
+| `spec pull <project> [--owner --repo --label] [--generate]` | Pull GitHub issues as stories (flags override the stored github source). |
 | `spec pull-jira <project> [--jql]` | Pull Jira issues as stories. |
 | `docs <project>` | Generate living documentation. |
 
