@@ -111,10 +111,13 @@ GitHub/Jira MCP story ingestion; living docs. See `README.md` for the full pictu
    bundled as a PR in the run dir always and opened as a real branch + GitHub PR
    with `spec add --open-pr` (`createRepairPr` `repoRoot`, original branch
    restored afterwards). Verified live against a registered external repo + the
-   copy-change demo app. REMAINING: live-verify the `--open-pr` path against a
-   real GitHub remote (the no-remote bundle fallback is tested); the dashboard
-   story form has no open-PR control (bundle-only there); a connected repo must
-   have `@playwright/test` installed for `runnable: true`.
+   copy-change demo app, INCLUDING the `--open-pr` path against a real GitHub
+   remote (2026-07-01: a throwaway public repo; `spec add --open-pr` opened a
+   real PR with the widened-locator diff, SHA-pinned before/after screenshot
+   URLs that resolve, commit scoped to the test + images, and the repo left
+   back on `main`). REMAINING: the dashboard story form has no open-PR control
+   (bundle-only there); a connected repo must have `@playwright/test` installed
+   for `runnable: true`.
 3. **Phase 3 — connectors (HARDENED, 2026-06-10).** `callToolText` throws on
    tool-level MCP errors (a private repo / bad token reads as what it is, not a
    JSON.parse crash or empty list); GitHub paginates (`page`/`per_page` default,
