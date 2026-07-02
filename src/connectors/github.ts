@@ -52,6 +52,33 @@ export function issuesToStories(issues: RawIssue[]): MappedStory[] {
   return issues.filter((issue) => !issue.pull_request).map(issueToStory);
 }
 
+export interface GithubPullFlags {
+  owner?: string;
+  repo?: string;
+  label?: string;
+}
+
+/**
+ * Merge a project's stored github source config with `spec pull` CLI flags.
+ * Flags win over stored values; everything else stored (mcp launch/endpoint,
+ * tool name, pagination params) carries through untouched. Throws when
+ * owner/repo are missing from both, so the caller can print a clean error.
+ */
+export function resolveGithubPullConfig(
+  stored: Partial<GithubSourceConfig> | undefined,
+  flags: GithubPullFlags
+): GithubSourceConfig {
+  const owner = flags.owner ?? stored?.owner;
+  const repo = flags.repo ?? stored?.repo;
+  if (!owner || !repo) {
+    throw new Error(
+      'No GitHub repo configured. Pass --owner/--repo, or store them once with ' +
+        '`testpilot project add-source <project-id> --type github --owner <owner> --repo <repo>`.'
+    );
+  }
+  return { ...stored, owner, repo, ...(flags.label !== undefined ? { label: flags.label } : {}) };
+}
+
 /** Default launch config for the reference GitHub MCP server. */
 export function defaultGithubMcp(token: string): McpServerConfig {
   return {

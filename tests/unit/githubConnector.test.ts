@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { issuesToStories, issueToStory, parseIssuesPayload } from '../../src/connectors/github.js';
+import { issuesToStories, issueToStory, parseIssuesPayload, resolveGithubPullConfig } from '../../src/connectors/github.js';
 
 describe('github connector mapping', () => {
   it('maps an issue to a story', () => {
@@ -36,5 +36,43 @@ describe('parseIssuesPayload', () => {
 
   it('throws with the payload head on non-JSON (e.g. an HTML error page)', () => {
     expect(() => parseIssuesPayload('<html>404 Not Found</html>')).toThrow(/unparseable.*404 Not Found/s);
+  });
+});
+
+describe('resolveGithubPullConfig', () => {
+  it('uses the stored source config when no flags are given', () => {
+    const config = resolveGithubPullConfig(
+      { owner: 'acme', repo: 'shop', label: 'qa', tool: 'issues_list', perPage: 25 },
+      {}
+    );
+    expect(config).toEqual({ owner: 'acme', repo: 'shop', label: 'qa', tool: 'issues_list', perPage: 25 });
+  });
+
+  it('lets flags override stored values while keeping the rest (mcp, pagination) intact', () => {
+    const mcp = { transport: 'http' as const, url: 'https://mcp.example/github' };
+    const config = resolveGithubPullConfig(
+      { owner: 'acme', repo: 'shop', label: 'qa', mcp, perPageParam: 'perPage' },
+      { repo: 'storefront', label: 'regression' }
+    );
+    expect(config).toEqual({
+      owner: 'acme',
+      repo: 'storefront',
+      label: 'regression',
+      mcp,
+      perPageParam: 'perPage'
+    });
+  });
+
+  it('works from flags alone (no stored source)', () => {
+    expect(resolveGithubPullConfig(undefined, { owner: 'acme', repo: 'shop' })).toEqual({
+      owner: 'acme',
+      repo: 'shop'
+    });
+  });
+
+  it('throws a pointer to project add-source when owner/repo are missing from both', () => {
+    expect(() => resolveGithubPullConfig(undefined, {})).toThrow(/add-source/);
+    expect(() => resolveGithubPullConfig({ owner: 'acme' }, {})).toThrow(/add-source/);
+    expect(() => resolveGithubPullConfig({ repo: 'shop' }, { label: 'qa' })).toThrow(/add-source/);
   });
 });

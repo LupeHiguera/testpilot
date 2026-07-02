@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Command } from 'commander';
 import { observePage } from '../browser/observePage.js';
-import { fetchGithubStories } from '../connectors/github.js';
+import { fetchGithubStories, GithubSourceConfig, resolveGithubPullConfig } from '../connectors/github.js';
 import { fetchJiraStories, JiraSourceConfig } from '../connectors/jira.js';
 import { createRunDir, defaultBaseUrl, generatedTestsDir } from '../core/config.js';
 import { generateDocs } from '../docs/generateDocs.js';
@@ -354,9 +354,9 @@ specCmd
   .command('pull')
   .description('Pull GitHub issues as stories via the GitHub MCP server')
   .argument('<project-id>')
-  .requiredOption('--owner <owner>', 'GitHub repo owner')
-  .requiredOption('--repo <repo>', 'GitHub repo name')
-  .option('--label <label>', 'Only issues with this label')
+  .option('--owner <owner>', 'GitHub repo owner (overrides the stored github source config)')
+  .option('--repo <repo>', 'GitHub repo name (overrides the stored github source config)')
+  .option('--label <label>', 'Only issues with this label (overrides the stored github source config)')
   .option('--generate', 'Generate a test for each pulled story')
   .option('--mode <mode>', 'Model mode for --generate', 'mock')
   .action(async (projectId, options) => {
@@ -366,14 +366,27 @@ specCmd
       process.exitCode = 1;
       return;
     }
+    const stored = project.sources.find((entry) => entry.type === 'github')?.config as
+      | Partial<GithubSourceConfig>
+      | undefined;
+    let config: GithubSourceConfig;
+    try {
+      config = resolveGithubPullConfig(stored, { owner: options.owner, repo: options.repo, label: options.label });
+    } catch (error) {
+      console.error((error as Error).message);
+      process.exitCode = 1;
+      return;
+    }
     const token = await resolveGithubToken();
-    if (!token) {
+    // A stored mcp config brings its own server (and credentials); the token is
+    // only needed to launch the default reference server.
+    if (!token && !config.mcp) {
       console.error('No GitHub token found. Set GITHUB_TOKEN or run `gh auth login`.');
       process.exitCode = 1;
       return;
     }
-    const mapped = await fetchGithubStories({ owner: options.owner, repo: options.repo, label: options.label }, token);
-    console.log(`Pulled ${mapped.length} issue(s) from ${options.owner}/${options.repo}`);
+    const mapped = await fetchGithubStories(config, token ?? '');
+    console.log(`Pulled ${mapped.length} issue(s) from ${config.owner}/${config.repo}`);
     for (const item of mapped) {
       const story = await addStory({ projectId: project.id, source: 'github', externalId: item.externalId, title: item.title, body: item.body });
       console.log(`  ${story.externalId}  ${story.title}`);

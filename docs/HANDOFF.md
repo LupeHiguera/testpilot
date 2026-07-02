@@ -123,10 +123,11 @@ GitHub/Jira MCP story ingestion; living docs. See `README.md` for the full pictu
    the REST search envelope via `startAt`. Both connectors are exercised
    end-to-end over a REAL stdio MCP connection in
    `tests/integration/connectors.test.ts` (fixture server in `tests/fixtures/`).
-   REMAINING: a genuinely live Jira verification needs a real Atlassian MCP
-   endpoint + token (user-supplied) — run `spec pull-jira` against it; `spec pull`
-   builds its GitHub config from CLI flags only (does not yet read the project's
-   stored github source config).
+   `spec pull` now reads the project's stored github source config
+   (`resolveGithubPullConfig` merges it with `--owner/--repo/--label` flag
+   overrides; the token is only required when the config doesn't bring its own
+   `mcp`). REMAINING: a genuinely live Jira verification needs a real Atlassian
+   MCP endpoint + token (user-supplied) — run `spec pull-jira` against it.
 4. **Phase 4 — productionize the dashboard (DONE, 2026-06-10).** The perf DOM
    budgets are scoped to the live canyon pane (`.canyon-pane`: idle ≤ 200,
    full run ≤ 4500 — measured ~28/~3053), so the Expeditions history rail (which
