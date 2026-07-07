@@ -6,8 +6,10 @@ import type { Page } from '@playwright/test';
  *
  * - `buttons`: everything `getByRole('button')` matches — <button>,
  *   [role=button], and submit/button inputs (whose accessible name is `value`).
- * - `links`: `getByRole('link')` targets (<a href>), capped so a nav-heavy page
- *   doesn't bloat the recorded artifacts.
+ * - `links`: `getByRole('link')` targets (<a href>).
+ *
+ * Every list is capped at 100 entries so a pathological page (endless nav, a
+ * generated grid of controls) can't bloat the recorded run artifacts.
  *
  * The accessible name is approximated as aria-label, else an input's value,
  * else the trimmed text content.
@@ -28,6 +30,7 @@ export async function captureControls(page: Page): Promise<{
           return element.textContent?.trim() ?? '';
         })
         .filter(Boolean)
+        .slice(0, 100)
     );
 
   const links = await page.locator('a[href]').evaluateAll((elements) =>
@@ -38,12 +41,14 @@ export async function captureControls(page: Page): Promise<{
   );
 
   const inputs = await page.locator('input').evaluateAll((elements) =>
-    elements.map((input) => ({
-      name: input.getAttribute('name') ?? '',
-      type: input.getAttribute('type') ?? '',
-      placeholder: input.getAttribute('placeholder') ?? '',
-      label: input.closest('label')?.textContent?.trim() ?? ''
-    }))
+    elements
+      .map((input) => ({
+        name: input.getAttribute('name') ?? '',
+        type: input.getAttribute('type') ?? '',
+        placeholder: input.getAttribute('placeholder') ?? '',
+        label: input.closest('label')?.textContent?.trim() ?? ''
+      }))
+      .slice(0, 100)
   );
 
   return { buttons, links, inputs };

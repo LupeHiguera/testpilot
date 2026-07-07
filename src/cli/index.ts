@@ -17,7 +17,7 @@ import { startDemoServer, stopProcessTree, withVariant } from '../pipeline/demoS
 import { runStoryPipeline } from '../pipeline/story.js';
 import { getProject, listProjects, saveProject } from '../projects/store.js';
 import { Project, StorySource } from '../projects/types.js';
-import { addStory } from '../stories/store.js';
+import { addStory, upsertExternalStory } from '../stories/store.js';
 import { createRepairPr } from '../pr/createRepairPr.js';
 import { applyRepair } from '../repair/applyPatch.js';
 import { proposePatch } from '../repair/proposePatch.js';
@@ -388,8 +388,8 @@ specCmd
     const mapped = await fetchGithubStories(config, token ?? '');
     console.log(`Pulled ${mapped.length} issue(s) from ${config.owner}/${config.repo}`);
     for (const item of mapped) {
-      const story = await addStory({ projectId: project.id, source: 'github', externalId: item.externalId, title: item.title, body: item.body });
-      console.log(`  ${story.externalId}  ${story.title}`);
+      const { story, action } = await upsertExternalStory({ projectId: project.id, source: 'github', externalId: item.externalId, title: item.title, body: item.body });
+      console.log(`  ${story.externalId}  ${story.title}${action === 'created' ? '' : ` (${action})`}`);
       if (options.generate) {
         const appServer = project.id === 'demo' ? await startDemoServer() : undefined;
         try {
@@ -429,8 +429,8 @@ specCmd
     const mapped = await fetchJiraStories({ ...config, jql: options.jql ?? config.jql });
     console.log(`Pulled ${mapped.length} Jira issue(s)`);
     for (const item of mapped) {
-      const story = await addStory({ projectId: project.id, source: 'jira', externalId: item.externalId, title: item.title, body: item.body });
-      console.log(`  ${story.externalId}  ${story.title}`);
+      const { story, action } = await upsertExternalStory({ projectId: project.id, source: 'jira', externalId: item.externalId, title: item.title, body: item.body });
+      console.log(`  ${story.externalId}  ${story.title}${action === 'created' ? '' : ` (${action})`}`);
     }
   });
 

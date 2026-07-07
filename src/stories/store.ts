@@ -36,6 +36,34 @@ export async function addStory(input: {
   return story;
 }
 
+/**
+ * Add a story pulled from an external tracker, or update the one already pulled
+ * for the same issue — re-running `spec pull` must not duplicate every story.
+ * Identity is (source, externalId). An unchanged issue is left untouched; a
+ * changed title/body is written through AND the status reset to 'new', because
+ * a test generated for the old text no longer reflects the story.
+ */
+export async function upsertExternalStory(input: {
+  projectId: string;
+  source: Story['source'];
+  externalId: string;
+  title: string;
+  body: string;
+}): Promise<{ story: Story; action: 'created' | 'updated' | 'unchanged' }> {
+  const existing = (await listStories(input.projectId)).find(
+    (story) => story.source === input.source && story.externalId === input.externalId
+  );
+  if (!existing) {
+    return { story: await addStory(input), action: 'created' };
+  }
+  if (existing.title === input.title && existing.body === input.body) {
+    return { story: existing, action: 'unchanged' };
+  }
+  const updated: Story = { ...existing, title: input.title, body: input.body, status: 'new' };
+  await fs.writeFile(path.join(storyDir(input.projectId), `${existing.id}.json`), JSON.stringify(updated, null, 2), 'utf8');
+  return { story: updated, action: 'updated' };
+}
+
 export async function listStories(projectId: string): Promise<Story[]> {
   const dir = storyDir(projectId);
   const entries = await fs.readdir(dir).catch(() => [] as string[]);

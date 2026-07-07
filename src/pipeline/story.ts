@@ -46,7 +46,11 @@ export async function runStoryPipeline(
     const intent = await client.parseSpec(story.body);
     emit('spec', 'pass', `Intent: ${intent.route} → ${intent.expectedPath}`, { intent });
 
-    emit('observe', 'start', `Observing ${project.baseUrl}${intent.route}`);
+    // Resolve the route onto the base URL properly — naive concatenation puts the
+    // route after any query string ("…?variant=x/login") in the streamed label.
+    const observeUrl = new URL(project.baseUrl);
+    observeUrl.pathname = intent.route;
+    emit('observe', 'start', `Observing ${observeUrl}`);
     const observation = await observePage(project.baseUrl, intent.route, runDir);
     emit('observe', 'pass', `Captured ${observation.buttons.length} buttons, ${observation.inputs.length} inputs`, {
       screenshot: rel(observation.screenshotPath)

@@ -40,6 +40,11 @@ export async function saveProject(project: Project): Promise<string> {
   return file;
 }
 
+/** Drop a leading U+FEFF byte-order mark so a BOM'd file still parses. */
+function stripBom(text: string): string {
+  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+}
+
 async function readAll(): Promise<Project[]> {
   const entries = await fs.readdir(registryDir).catch(() => [] as string[]);
   const projects = await Promise.all(
@@ -48,8 +53,16 @@ async function readAll(): Promise<Project[]> {
       .map((file) =>
         fs
           .readFile(path.join(registryDir, file), 'utf8')
-          .then((text) => JSON.parse(text) as Project)
-          .catch(() => undefined)
+          // Tolerate a UTF-8 BOM: project files get hand-edited, and Windows
+          // editors/tools (e.g. PowerShell 5 Out-File -Encoding utf8) prepend one,
+          // which JSON.parse rejects.
+          .then((text) => JSON.parse(stripBom(text)) as Project)
+          .catch((error) => {
+            // A broken file must not take the whole registry down, but silently
+            // vanishing reads as "Unknown project" with no clue — say why.
+            console.warn(`Skipping unreadable project file ${file}: ${String(error)}`);
+            return undefined;
+          })
       )
   );
   return projects.filter((project): project is Project => Boolean(project));
