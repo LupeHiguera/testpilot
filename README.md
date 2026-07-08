@@ -141,8 +141,9 @@ sources. Generated tests and docs are written **into the connected repo**.
 npm run testpilot -- project add acme --name "Acme web" --repo /path/to/acme \
   --base-url http://127.0.0.1:5173 --tests-dir tests/e2e
 
-# Upload a story (or use the dashboard's Stories panel). With --open-pr, a safe
-# repair that re-runs green is opened as a real GitHub PR in the project's repo
+# Upload a story (or use the dashboard's Stories panel). With --open-pr — or the
+# dashboard's "Open a GitHub PR if a safe repair lands" toggle — a safe repair
+# that re-runs green is opened as a real GitHub PR in the project's repo
 # (default: a local reviewable PR bundle).
 npm run testpilot -- spec add acme ./story.md --open-pr
 
@@ -173,6 +174,8 @@ afterwards, so testpilot never leaves the repo mid-repair.
 project. The connectors paginate (GitHub `page`/`per_page`, Jira `startAt`),
 flatten Jira Cloud's ADF rich-text descriptions to plain text, and surface auth
 failures (private repo, bad token) as real errors instead of empty results.
+Re-pulling is idempotent: an already-pulled issue is updated in place (and its
+flow re-flagged for testing if the text changed), never duplicated.
 GitHub auth comes from `GITHUB_TOKEN` or `gh auth token`.
 
 **Living documentation** writes one markdown page per flow — the plain-English
