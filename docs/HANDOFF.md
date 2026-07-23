@@ -133,8 +133,14 @@ GitHub/Jira MCP story ingestion; living docs. See `README.md` for the full pictu
    `spec pull` now reads the project's stored github source config
    (`resolveGithubPullConfig` merges it with `--owner/--repo/--label` flag
    overrides; the token is only required when the config doesn't bring its own
-   `mcp`). REMAINING: a genuinely live Jira verification needs a real Atlassian
-   MCP endpoint + token (user-supplied) — run `spec pull-jira` against it.
+   `mcp`). LIVE-VERIFIED (2026-07-22): `spec pull-jira` ran against a real
+   Atlassian Cloud site through `uvx mcp-atlassian` (stdio MCP, stored source
+   config) — 3 seeded issues pulled with correct ADF flattening, re-pull
+   idempotent, and the new `--generate` flag (parity with `spec pull`) drove
+   each story through the pipeline: one story's "log in" phrasing vs the page's
+   "Sign in" button organically exercised fail → UI_COPY_CHANGE → widened
+   locator → green re-run in the connected repo → PR bundle. **No roadmap
+   items remain open.**
 4. **Phase 4 — productionize the dashboard (DONE, 2026-06-10).** The perf DOM
    budgets are scoped to the live canyon pane (`.canyon-pane`: idle ≤ 200,
    full run ≤ 4500 — measured ~28/~3053), so the Expeditions history rail (which

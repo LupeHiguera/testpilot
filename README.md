@@ -51,6 +51,37 @@ spec ─▶ observe ─▶ generate ─▶ run ─▶ diagnose ─▶ repair ─
 6. **Repair** — only if the failure is safe drift the guardrails allow.
 7. **Report** the decision (and assemble a PR if a repair was applied).
 
+The full system — story sources on one end, the safety fork on the other:
+
+```mermaid
+flowchart LR
+  subgraph sources["Story sources"]
+    J["Jira issues<br/>(MCP, JQL)"]
+    G["GitHub issues<br/>(MCP, label)"]
+    U["Upload /<br/>dashboard"]
+  end
+  J --> S["Stories<br/>(idempotent upsert)"]
+  G --> S
+  U --> S
+  S --> P["Parse intent"] --> O["Observe page"] --> T["Generate test"]
+  T --> R["Run in the<br/>project's repo"]
+  R -- pass --> Doc["Report ·<br/>living docs"]
+  R -- fail --> D{"Diagnose"}
+  D -- "safe drift<br/>(selector / copy / flake)" --> Fix["Guarded repair<br/>→ re-run"]
+  D -- "regression · outage<br/>· auth · unknown" --> Ref["Refused —<br/>needs a human"]
+  Fix -- green --> PR["PR bundle /<br/>GitHub PR"]
+  Fix -- "still failing" --> Ref
+
+  classDef stage fill:#e9d8b4,stroke:#7c3a2e,color:#2a140e
+  classDef pass fill:#bfe0c9,stroke:#1f7d72,color:#12352f
+  classDef stop fill:#f6c9bd,stroke:#a8432c,color:#4a150c
+  classDef src fill:#e6c281,stroke:#7c3a2e,color:#2a140e
+  class J,G,U src
+  class S,P,O,T,R,D stage
+  class Fix,PR,Doc pass
+  class Ref stop
+```
+
 ### The safety model
 
 This is the heart of testpilot. A repair is only ever applied when **every** guard agrees:
@@ -154,8 +185,14 @@ npm run testpilot -- spec pull acme --owner acme --repo web --label needs-test -
 npm run testpilot -- project add-source acme --type github --owner acme --repo web --label needs-test
 npm run testpilot -- spec pull acme --generate
 
-# Pull from Jira via a configured Jira MCP server
-npm run testpilot -- spec pull-jira acme --jql "labels = needs-test"
+# Pull from Jira: store the Jira MCP server + JQL once, then pull (or pull-and-run
+# with --generate). Works with any Jira MCP server; e.g. mcp-atlassian via uvx:
+npm run testpilot -- project add-source acme --type jira \
+  --command uvx --arg mcp-atlassian \
+  --env JIRA_URL=https://your-site.atlassian.net \
+  --env JIRA_USERNAME=you@example.com --env JIRA_API_TOKEN=... \
+  --jql "labels = needs-test"
+npm run testpilot -- spec pull-jira acme --generate
 
 # Generate living documentation backed by the tests
 npm run testpilot -- docs acme
@@ -217,7 +254,7 @@ stays reproducible.
 | `project add-source <project> --type jira\|github ...` | Store a story source (repo, JQL, MCP server) on a project. |
 | `spec add <project> <file> [--open-pr]` | Upload a story and run it; optionally PR a green repair into the project repo. |
 | `spec pull <project> [--owner --repo --label] [--generate]` | Pull GitHub issues as stories (flags override the stored github source). |
-| `spec pull-jira <project> [--jql]` | Pull Jira issues as stories. |
+| `spec pull-jira <project> [--jql] [--generate]` | Pull Jira issues as stories (JQL overrides the stored jira source). |
 | `docs <project>` | Generate living documentation. |
 
 ---
@@ -285,8 +322,9 @@ revision only passes when every criterion clears the bar.
 - **Runnable connected projects need `@playwright/test` installed** in their own repo
   (tests run with the project's toolchain, not testpilot's).
 - **Both connectors are exercised end-to-end against a real MCP server** in the test
-  suite (pagination, errors, Jira ADF); pointing Jira at a live Atlassian instance
-  still requires your own Atlassian MCP endpoint + token.
+  suite (pagination, errors, Jira ADF), and the Jira path is verified against a live
+  Atlassian Cloud site (via `uvx mcp-atlassian`) — you supply your own site URL,
+  account email, and API token; they stay in the gitignored project registry.
 
 ---
 

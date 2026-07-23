@@ -409,6 +409,8 @@ specCmd
   .description('Pull Jira issues as stories via a configured Jira MCP server')
   .argument('<project-id>')
   .option('--jql <jql>', 'Override the JQL from the project source config')
+  .option('--generate', 'Run each pulled story through the pipeline')
+  .option('--mode <mode>', 'Model mode for --generate', 'mock')
   .action(async (projectId, options) => {
     const project = await getProject(projectId);
     if (!project) {
@@ -431,6 +433,17 @@ specCmd
     for (const item of mapped) {
       const { story, action } = await upsertExternalStory({ projectId: project.id, source: 'jira', externalId: item.externalId, title: item.title, body: item.body });
       console.log(`  ${story.externalId}  ${story.title}${action === 'created' ? '' : ` (${action})`}`);
+      if (options.generate) {
+        const appServer = project.id === 'demo' ? await startDemoServer() : undefined;
+        try {
+          const result = await runStoryPipeline(project, story, { mode: options.mode as ModelMode });
+          console.log(`    → ${result.status}`);
+        } finally {
+          if (appServer) {
+            stopProcessTree(appServer.pid);
+          }
+        }
+      }
     }
   });
 
